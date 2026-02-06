@@ -69,6 +69,7 @@ class TokenKind(IntEnum):
     LPAREN = 64  # (
     RPAREN = 65  # )
 
+    @property
     def is_trivia(self) -> bool:
         return self in (
             TokenKind.WHITESPACE,

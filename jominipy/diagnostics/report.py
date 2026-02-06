@@ -1,7 +1,5 @@
 """Diagnostics helpers."""
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 
 from jominipy.diagnostics.diagnostic import Diagnostic

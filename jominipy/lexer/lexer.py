@@ -1,17 +1,28 @@
 """Lexer."""
 
+from dataclasses import dataclass
+
 from jominipy.diagnostics import Diagnostic
 from jominipy.diagnostics.codes import LEXER_UNTERMINATED_STRING
 from jominipy.lexer.tokens import Token, TokenFlags, TokenKind
 from jominipy.text import TextRange, TextSize, slice_text_range
 
 
-class Lexer:
-    """Lossless lexer that emits trivia and non-trivia tokens.
+@dataclass(frozen=True, slots=True)
+class LexerCheckpoint:
+    """Lexer checkpoint."""
 
-    The structure follows Biome's lexer pattern: `next_token` advances the
-    internal cursor and returns a single token with a kind, range, and flags.
-    """
+    position: int
+    current_start: TextSize
+    current_kind: TokenKind
+    current_flags: TokenFlags
+    after_newline: bool
+    eof_emitted: bool
+    diagnostics_position: int
+
+
+class Lexer:
+    """Lossless lexer that emits trivia and non-trivia tokens."""
 
     def __init__(self, source: str, *, allow_multiline_strings: bool = False) -> None:
         self._source = source
@@ -26,10 +37,12 @@ class Lexer:
 
     @property
     def source(self) -> str:
+        """Original source text."""
         return self._source
 
     @property
     def diagnostics(self) -> list[Diagnostic]:
+        """List of diagnostics emitted during lexing."""
         return self._diagnostics
 
     @property
@@ -72,10 +85,36 @@ class Lexer:
         self._current_flags |= TokenFlags.PRECEDING_LINE_BREAK if self._after_newline else TokenFlags.NONE
         self._current_kind = kind
 
-        if not kind.is_trivia():
+        if not kind.is_trivia:
             self._after_newline = False
 
         return Token(kind, self.current_range, self._current_flags)
+
+    @property
+    def has_preceding_line_break(self) -> bool:
+        return bool(self._current_flags & TokenFlags.PRECEDING_LINE_BREAK)
+
+    @property
+    def checkpoint(self) -> LexerCheckpoint:
+        return LexerCheckpoint(
+            position=self._position,
+            current_start=self._current_start,
+            current_kind=self._current_kind,
+            current_flags=self._current_flags,
+            after_newline=self._after_newline,
+            eof_emitted=self._eof_emitted,
+            diagnostics_position=len(self._diagnostics),
+        )
+
+    def rewind(self, checkpoint: LexerCheckpoint) -> None:
+        self._position = checkpoint.position
+        self._current_start = checkpoint.current_start
+        self._current_kind = checkpoint.current_kind
+        self._current_flags = checkpoint.current_flags
+        self._after_newline = checkpoint.after_newline
+        self._eof_emitted = checkpoint.eof_emitted
+        if len(self._diagnostics) > checkpoint.diagnostics_position:
+            self._diagnostics = self._diagnostics[: checkpoint.diagnostics_position]
 
     def lex(self) -> list[Token]:
 

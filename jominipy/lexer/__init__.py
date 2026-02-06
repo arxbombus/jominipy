@@ -1,6 +1,11 @@
 """Lexer."""
 
-from jominipy.lexer.lexer import Lexer, dump_tokens, token_text
+from jominipy.lexer.buffered_lexer import (
+    BufferedLexer,
+    LexContext,
+    LookaheadToken,
+)
+from jominipy.lexer.lexer import Lexer, LexerCheckpoint, dump_tokens, token_text
 from jominipy.lexer.tokens import (
     Token,
     TokenFlags,
@@ -11,7 +16,11 @@ from jominipy.lexer.tokens import (
 )
 
 __all__ = [
+    "BufferedLexer",
+    "LexContext",
     "Lexer",
+    "LexerCheckpoint",
+    "LookaheadToken",
     "Token",
     "TokenFlags",
     "TokenKind",

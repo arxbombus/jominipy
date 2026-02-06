@@ -1,4 +1,4 @@
-"""Centralized diagnostic codes and messages."""
+"""Diagnostic codes and messages."""
 
 from dataclasses import dataclass
 from typing import Final, Literal

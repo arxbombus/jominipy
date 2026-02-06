@@ -24,7 +24,7 @@ def test_campaign_stats_minimal_block():
     ).lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # campaign_stats = { { id = 0 } { id = 1 } }
     kinds = [t.kind for t in non_trivia]
@@ -75,7 +75,7 @@ def test_meta_data_core_fields_lex_correctly():
     ).lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # meta_data = {
     assert non_trivia[0].kind == TokenKind.IDENTIFIER
@@ -144,7 +144,7 @@ def test_eu4_header_and_campaign_stats():
     ).lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # First token should be EU4txt (bare identifier)
     assert non_trivia[0].kind == TokenKind.IDENTIFIER
@@ -191,7 +191,7 @@ def test_dense_inline_numeric_boolean_block():
     src = "868416617618464 = { 11777 4108 { 5632 4187=1089 10={ no true 45056 { 0=true } } 0=1089 } }"
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # First token: big int key
     assert non_trivia[0].kind == TokenKind.INT
@@ -233,7 +233,7 @@ def test_savegame_version_block():
     ).lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # savegame_version = {
     assert non_trivia[0].kind == TokenKind.IDENTIFIER
@@ -261,7 +261,7 @@ def test_ck3_style_gene_block_structure():
     """.lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # genes = {
     assert non_trivia[0].kind == TokenKind.IDENTIFIER
@@ -305,7 +305,7 @@ def test_unary_and_binary_plus_minus_operators():
     """.lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     def find(name: str) -> int:
         return next(
@@ -348,7 +348,7 @@ def test_multi_char_comparison_operators():
     """.lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     def pair(name: str):
         idx = next(i for i, t in enumerate(non_trivia) if t.kind == TokenKind.IDENTIFIER and token_text(src, t) == name)
@@ -383,7 +383,7 @@ def test_multi_char_comparison_operators():
 def test_newline_flag_on_next_token():
     src = "a=1\r\nb=2\nc=3\r\nd=4"
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # We expect 4 name identifiers: a, b, c, d
     names = [token_text(src, t) for t in non_trivia if t.kind == TokenKind.IDENTIFIER]
@@ -423,7 +423,7 @@ def test_dotted_identifiers_and_filenames():
     """.lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # file_name key and quoted value with dots
     idx_file = next(i for i, t in enumerate(non_trivia) if token_text(src, t) == "file_name")
@@ -454,7 +454,7 @@ def test_numeric_sequence_with_multiple_dots():
     src = "meta_date=1066.9.15"
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     # meta_date = FLOAT(1066.9), DOT, INT(15)
     assert non_trivia[0].kind == TokenKind.IDENTIFIER
@@ -481,7 +481,7 @@ def test_complex_quoted_strings_with_formatting():
     """.lstrip()
 
     tokens = lex(src)
-    non_trivia = [t for t in tokens if not t.kind.is_trivia()]
+    non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
     idx_desc = next(i for i, t in enumerate(non_trivia) if token_text(src, t) == "description")
     desc_val = non_trivia[idx_desc + 2]
@@ -499,7 +499,7 @@ def test_complex_quoted_strings_with_formatting():
 
 
 def test_dump_tokens_smoke():
-    src = 'a=1\n# comment\nb="hi\\"there\nhello = world # inline comment"'
+    src = 'a=1\n# comment\nb="hi\\"there\nhello = world # inline comment\n# comment 2 # I wonder what this does\n# multiline\n# comment"'
     print(src)
     lexer = Lexer(src)
     tokens = lexer.lex()

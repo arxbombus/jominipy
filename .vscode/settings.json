@@ -28,7 +28,8 @@
 		"dont",
 		"genderportrait",
 		"soundcategory",
-		"soundeffect"
+		"soundeffect",
+		"popleft"
 	],
 	"FSharp.suggestGitignore": false
 }
