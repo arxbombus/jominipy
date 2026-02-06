@@ -42,7 +42,7 @@ whitespace = false
 
 # Rule: Follow Conventional Commits format.
 # See https://www.conventionalcommits.org/.
-conventional = false
+conventional = true
 
 # Rule: List of allowed commit scopes.
 # An empty list allows all scopes. Example: ["docs", "cli"].
