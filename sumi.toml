@@ -6,7 +6,7 @@
 quiet = false
 
 # Displays parsed commit message.
-display = false
+display = true
 
 # Sets display format: cli, json, table, toml.
 format = "cli"
@@ -24,21 +24,21 @@ description_case = "any"
 
 # Rule: Use the imperative mood in the description.
 # Example: 'Fix bug' instead of 'Fixed bug'.
-imperative = false
+imperative = true
 
 # Rule: Do not end commit header with a period.
 no_period = false
 
 # Rule: Header length limit.
 # A value of 0 disables the rule.
-max_header_length = 0
+max_header_length = 50
 
 # Rule: Body line length limit.
 # A value of 0 disables the rule.
-max_body_length = 0
+max_body_length = 74
 
 # Rule: No leading, trailing, or consecutive spaces.
-whitespace = false
+whitespace = true
 
 # Rule: Follow Conventional Commits format.
 # See https://www.conventionalcommits.org/.
