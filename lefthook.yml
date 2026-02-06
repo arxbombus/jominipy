@@ -1,0 +1,15 @@
+commit-msg:
+  commands:
+    "Linting commit messages with git-sumi":
+      run: uv run git-sumi lint {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    "Type checking with Pyrefly":
+      glob: "*.py"
+      run: uv run pyrefly check {staged_files}
+
+    "Checking with Ruff":
+      glob: "*.py"
+      run: uv run ruff check {staged_files}

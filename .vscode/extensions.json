@@ -1,0 +1,9 @@
+{
+	"recommendations": [
+		"charliermarsh.ruff",
+		"teticio.python-envy",
+		"ms-python.python",
+		"twixes.pypi-assistant",
+		"meta.pyrefly"
+	]
+}

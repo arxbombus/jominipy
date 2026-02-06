@@ -1,0 +1,12 @@
+[submodule "references/cwtools"]
+	path = references/cwtools
+	url = https://github.com/cwtools/cwtools.git
+[submodule "references/hoi4-rules"]
+	path = references/hoi4-rules
+	url = https://github.com/cwtools/cwtools-hoi4-config.git
+[submodule "references/jomini"]
+	path = references/jomini
+	url = https://github.com/rakaly/jomini.git
+[submodule "references/biome"]
+	path = references/biome
+	url = https://github.com/biomejs/biome.git

@@ -1,0 +1,34 @@
+{
+	"[python]": {
+		"editor.formatOnType": true,
+		"editor.formatOnSave": true,
+		"editor.defaultFormatter": "charliermarsh.ruff",
+		"editor.codeActionsOnSave": {
+			"source.fixAll": "explicit"
+		}
+	},
+	"cSpell.words": [
+		"unshift",
+		"trivia",
+		"trivias",
+		"jomini",
+		"jominipy",
+		"trivias",
+		"localisation",
+		"subscope",
+		"rulegen",
+		"subdoctrine",
+		"strat",
+		"strats",
+		"airforce",
+		"diplo",
+		"mapicon",
+		"neighbouring",
+		"organisation",
+		"dont",
+		"genderportrait",
+		"soundcategory",
+		"soundeffect"
+	],
+	"FSharp.suggestGitignore": false
+}
