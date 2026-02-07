@@ -1,6 +1,11 @@
 from pathlib import Path
 
-from jominipy.rules import load_rules_paths, parse_rules_text, to_file_ir
+from jominipy.rules import (
+    build_required_fields_by_object,
+    load_rules_paths,
+    parse_rules_text,
+    to_file_ir,
+)
 from jominipy.rules.normalize import normalize_ruleset
 from tests._debug import debug_dump_rules_ir
 
@@ -119,3 +124,20 @@ def test_rules_indexing_disambiguates_repeated_keys_with_declaration_paths() -> 
     assert ("technology#0", "x#0") in paths
     assert ("technology#0", "x#1") in paths
     assert ("technology#0", "child#0", "x#0") in paths
+
+
+def test_required_fields_extraction_from_cardinality() -> None:
+    source = """technology = {
+    ## cardinality = 1..1
+    required_field = int
+    ## cardinality = 0..1
+    optional_field = int
+    pattern[field] = int
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-required.cwt")
+    file_ir = to_file_ir(parsed)
+    normalized = normalize_ruleset((file_ir,))
+    required = build_required_fields_by_object(normalized.files[0].statements, include_implicit_required=False)
+
+    assert required == {"technology": ("required_field",)}

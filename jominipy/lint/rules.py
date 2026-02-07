@@ -10,10 +10,11 @@ from jominipy.analysis import AnalysisFacts
 from jominipy.ast import AstBlock
 from jominipy.diagnostics import (
     LINT_SEMANTIC_INCONSISTENT_SHAPE,
-    LINT_SEMANTIC_MISSING_START_YEAR,
+    LINT_SEMANTIC_MISSING_REQUIRED_FIELD,
     LINT_STYLE_SINGLE_LINE_BLOCK,
     Diagnostic,
 )
+from jominipy.rules.semantics import load_hoi4_required_fields
 from jominipy.text import TextRange, TextSize
 from jominipy.typecheck.rules import TypecheckFacts
 
@@ -69,19 +70,25 @@ class SemanticInconsistentShapeRule:
 
 
 @dataclass(frozen=True, slots=True)
-class SemanticMissingStartYearRule:
-    """Initial semantic placeholder for technology-like objects."""
+class SemanticMissingRequiredFieldRule:
+    """Derives required fields from CWTools schema and enforces them on object blocks."""
 
-    code: str = LINT_SEMANTIC_MISSING_START_YEAR.code
-    name: str = "semanticMissingStartYear"
+    code: str = LINT_SEMANTIC_MISSING_REQUIRED_FIELD.code
+    name: str = "semanticMissingRequiredField"
     category: str = "semantic"
     domain: LintDomain = "semantic"
     confidence: LintConfidence = "policy"
+    required_fields_by_object: dict[str, tuple[str, ...]] | None = None
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        required = self.required_fields_by_object
+        if required is None:
+            required = load_hoi4_required_fields(include_implicit_required=False)
+
         diagnostics: list[Diagnostic] = []
         for key, values in facts.top_level_values.items():
-            if "technology" not in key.lower():
+            object_required = required.get(key)
+            if object_required is None:
                 continue
             for value in values:
                 if not isinstance(value, AstBlock):
@@ -89,15 +96,20 @@ class SemanticMissingStartYearRule:
                 block_object = value.to_object() if value.is_object_like else None
                 if block_object is None:
                     continue
-                if "start_year" not in block_object:
+                for required_field in object_required:
+                    if required_field in block_object:
+                        continue
                     diagnostics.append(
                         Diagnostic(
                             code=self.code,
-                            message=LINT_SEMANTIC_MISSING_START_YEAR.message,
+                            message=(
+                                f"{LINT_SEMANTIC_MISSING_REQUIRED_FIELD.message} "
+                                f"Object `{key}` is missing `{required_field}`."
+                            ),
                             range=_find_key_range(text, key),
-                            severity=LINT_SEMANTIC_MISSING_START_YEAR.severity,
-                            hint="Add `start_year = <year>` to the technology block.",
-                            category=LINT_SEMANTIC_MISSING_START_YEAR.category,
+                            severity=LINT_SEMANTIC_MISSING_REQUIRED_FIELD.severity,
+                            hint=f"Add `{required_field} = ...` to `{key}`.",
+                            category=LINT_SEMANTIC_MISSING_REQUIRED_FIELD.category,
                         )
                     )
         return diagnostics
@@ -134,7 +146,7 @@ class StyleSingleLineMultiValueBlockRule:
 def default_lint_rules() -> tuple[LintRule, ...]:
     rules: list[LintRule] = [
         SemanticInconsistentShapeRule(),
-        SemanticMissingStartYearRule(),
+        SemanticMissingRequiredFieldRule(),
         StyleSingleLineMultiValueBlockRule(),
     ]
     return tuple(sorted(rules, key=lambda rule: (rule.category, rule.code, rule.name)))

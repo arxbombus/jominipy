@@ -18,6 +18,10 @@ from jominipy.rules.load import (
 )
 from jominipy.rules.parser import parse_rules_file, parse_rules_text, to_file_ir
 from jominipy.rules.result import RulesParseResult
+from jominipy.rules.semantics import (
+    build_required_fields_by_object,
+    load_hoi4_required_fields,
+)
 
 __all__ = [
     "IndexedRuleStatement",
@@ -31,6 +35,8 @@ __all__ = [
     "RuleSetIR",
     "RuleStatement",
     "RulesParseResult",
+    "build_required_fields_by_object",
+    "load_hoi4_required_fields",
     "load_rules_directory",
     "load_rules_paths",
     "parse_rules_file",

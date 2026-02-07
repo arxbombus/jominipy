@@ -300,7 +300,7 @@ The topics below are intentionally marked as **design-first** and must be expand
 2. Linter architecture:
    - define rule API, diagnostic model, and rule execution ordering
    - define how linter consumes AST views and (future) type facts without re-parsing
-   - define game/domain rule packaging (e.g., HOI4 required field rules like `start_year`)
+   - define game/domain rule packaging sourced from CWTools metadata (required fields/cardinality/scope)
 
 3. Type checker architecture:
    - define semantic/type fact model and how facts are produced from AST once
@@ -322,9 +322,9 @@ The topics below are intentionally marked as **design-first** and must be expand
 1. Linter engine taxonomy:
    - separate rule groups for semantic/domain vs style/layout.
    - examples to support:
-     - required field rules (`start_year` in HOI4 technology objects)
+     - required field rules derived from CWTools cardinality metadata
      - style rules (array/list must be multiline)
-     - configurable field-order rules (for example: `start_year`, `path`, `research_cost`, ...)
+     - configurable field-order rules (for example: `path`, `research_cost`, ...)
 
 2. Autofix contracts:
    - define fix payload model and application semantics

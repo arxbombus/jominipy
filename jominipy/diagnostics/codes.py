@@ -86,9 +86,9 @@ LINT_SEMANTIC_INCONSISTENT_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
     category="lint/semantic",
 )
 
-LINT_SEMANTIC_MISSING_START_YEAR: Final[DiagnosticSpec] = DiagnosticSpec(
-    code="LINT_SEMANTIC_MISSING_START_YEAR",
-    message="Semantic rule: technology blocks should define `start_year`.",
+LINT_SEMANTIC_MISSING_REQUIRED_FIELD: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LINT_SEMANTIC_MISSING_REQUIRED_FIELD",
+    message="Semantic rule: required field missing according to CWTools schema.",
     severity="warning",
     category="lint/semantic",
 )

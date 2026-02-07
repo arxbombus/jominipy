@@ -1,9 +1,15 @@
 from typing import cast
 
-from jominipy.lint.rules import LintRule
+from jominipy.analysis import AnalysisFacts
+from jominipy.diagnostics import Diagnostic
+from jominipy.lint.rules import (
+    LintConfidence,
+    LintDomain,
+    SemanticMissingRequiredFieldRule,
+)
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
-from jominipy.typecheck.rules import TypecheckRule
+from jominipy.typecheck.rules import TypecheckFacts, TypecheckRule
 
 
 def test_parse_result_analysis_facts_are_cached_across_engines() -> None:
@@ -36,7 +42,6 @@ def test_lint_runs_semantic_and_style_rules_deterministically() -> None:
 
     codes = [diagnostic.code for diagnostic in lint_result.diagnostics]
     assert codes == [
-        "LINT_SEMANTIC_MISSING_START_YEAR",
         "LINT_STYLE_SINGLE_LINE_BLOCK",
         "LINT_SEMANTIC_INCONSISTENT_SHAPE",
         "LINT_STYLE_SINGLE_LINE_BLOCK",
@@ -49,9 +54,6 @@ def test_typecheck_rejects_non_correctness_rule_domain() -> None:
         name = "badTypeDomain"
         domain = "semantic"
         confidence = "sound"
-
-        def run(self, facts, type_facts, text):
-            return []
 
     try:
         run_typecheck(
@@ -71,9 +73,6 @@ def test_typecheck_rejects_non_sound_confidence() -> None:
         domain = "correctness"
         confidence = "heuristic"
 
-        def run(self, facts, type_facts, text):
-            return []
-
     try:
         run_typecheck(
             "a=1\n",
@@ -85,20 +84,34 @@ def test_typecheck_rejects_non_sound_confidence() -> None:
         raise AssertionError("Expected ValueError for invalid typecheck confidence")
 
 
+class BadLintRule:
+    code: str = "LINT_BAD_DOMAIN"
+    name: str = "badLintDomain"
+    category: str = "semantic"
+    domain: LintDomain = "correctness"  # type: ignore
+    confidence: LintConfidence = "policy"
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        return []
+
+
 def test_lint_rejects_correctness_domain_rule() -> None:
-    class BadLintRule:
-        code = "LINT_BAD_DOMAIN"
-        name = "badLintDomain"
-        category = "semantic"
-        domain = "correctness"
-        confidence = "policy"
-
-        def run(self, facts, type_facts, text):
-            return []
-
     try:
-        run_lint("a=1\n", rules=cast(tuple[LintRule, ...], (BadLintRule(),)))
+        run_lint("a=1\n", rules=tuple([BadLintRule()]))
     except ValueError as exc:
         assert "invalid domain" in str(exc)
     else:
         raise AssertionError("Expected ValueError for invalid lint rule domain")
+
+
+def test_lint_cwtools_required_fields_rule_with_custom_schema() -> None:
+    source = "technology={ cost=1 }\n"
+    custom_rule = SemanticMissingRequiredFieldRule(
+        required_fields_by_object={"technology": ("required_field",)},
+    )
+
+    lint_result = run_lint(source, rules=(custom_rule,))
+    codes = [diagnostic.code for diagnostic in lint_result.diagnostics]
+
+    assert codes == ["LINT_SEMANTIC_MISSING_REQUIRED_FIELD"]
+    assert "required_field" in lint_result.diagnostics[0].message

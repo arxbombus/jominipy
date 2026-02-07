@@ -83,6 +83,18 @@ Every agent must perform this checklist before finishing a substantive task:
     - `load.py`: directory/path loaders for `.cwt` inputs
   - tests:
     - `tests/test_rules_ingest.py` (comment options/docs attachment + HOI4 sample ingest/indexing)
+- CWTools semantic metadata + declaration identity landed:
+  - typed metadata normalization in `jominipy/rules/normalize.py`:
+    - `cardinality`, `scope`, `push_scope`, `replace_scope`, `severity`, valueless flags
+  - declaration path disambiguation for repeated keys:
+    - `IndexedRuleStatement.declaration_path`
+  - debug dump includes metadata + declaration path:
+    - `tests/_debug.py` (`PRINT_RULES_IR=1`)
+  - semantic extraction helper:
+    - `jominipy/rules/semantics.py` (`build_required_fields_by_object`, `load_hoi4_required_fields`)
+  - lint semantic rule migrated from hardcoded example policy to CWTools-derived required fields:
+    - removed `start_year`-specific assumption
+    - new diagnostic code: `LINT_SEMANTIC_MISSING_REQUIRED_FIELD`
 - Implementation status adjustment:
   - implementation work is now paused
   - current focus is completing the full Phase 0 proposal and gating criteria across docs/memories
@@ -117,7 +129,7 @@ Every agent must perform this checklist before finishing a substantive task:
 - Immediate next step: map `jominipy/rules` normalized IR into lint/type-check rule registries while preserving one parse/facts lifecycle and domain contracts.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
-  2. first semantic/domain rule (`start_year` required for HOI4 technology objects)
+  2. first semantic/domain rule from CWTools-derived constraints (required fields/cardinality)
   3. first style/layout rules (multiline list/array + configurable field order)
   4. keep one-parse-lifecycle invariant via `JominiParseResult`
 - Biome parity remains a hard architectural constraint during implementation.
@@ -130,7 +142,7 @@ Every agent must perform this checklist before finishing a substantive task:
 The following topics were discussed and must be deeply expanded in design docs/notes before full implementation:
 1. Linter architecture:
    - rule API, diagnostics model, deterministic execution ordering
-   - domain/schema rules (e.g. required `start_year`) as lint/semantic validation concerns
+   - domain/schema rules sourced from CWTools metadata (cardinality/scope/options) as lint/semantic validation concerns
 2. Type checker architecture:
    - type fact model and single-pass fact generation from AST
    - boundary: type constraints (type checker) vs policy/required-field constraints (linter)
