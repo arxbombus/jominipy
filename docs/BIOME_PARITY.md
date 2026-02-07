@@ -23,11 +23,14 @@ For every parser/CST/AST feature, record:
 | Parser checkpoint/rewind | `biome_parser/src/lib.rs` | `jominipy/parser/parser.py` | adapted | Parser-level checkpoint object implemented |
 | Speculative parsing guard | `biome_parser/src/lib.rs` | `jominipy/parser/parser.py` | adapted | Context-managed speculative depth implemented |
 | Mode/feature gating | Biome feature support traits/options | `jominipy/parser/options.py` + `grammar.py` | adapted | Explicit mode/feature flags with grammar gates |
-| AST typed layer | Biome syntax wrappers/typed nodes | `jominipy/ast/*` | pending | Deferred until parser/CST contract is finalized |
+| AST typed layer | Biome syntax wrappers/typed nodes | `jominipy/ast/*` | adapted | AST v1 + Phase 1 implemented (`model`, `scalar`, `lower`); preserves CST-first semantics and delayed scalar interpretation |
+| Red CST wrappers | Biome red syntax wrappers | `jominipy/cst/*` (planned) | pending | Green CST exists; red-layer navigation/query wrappers are next major parity gap |
+| Block/list coercion policy | Biome typed-node semantic utilities | `jominipy/ast/*` | adapted | Canonical AST preserves statement order; derived object/array/mixed coercion helpers landed on `AstBlock` (last-write-wins + multimap modes) |
 
 ## Intentional deviations (must stay explicit)
 - Jomini-specific grammar policy lives in grammar routines (e.g., tagged block values), not in a generic shared grammar crate.
 - Current list helpers include only non-separated lists; `ParseSeparatedList` is intentionally deferred because current Jomini grammar does not rely on comma-separated constructs as a primary form.
+- Repeated keys (e.g. repeated `modifier`) are preserved in canonical AST; any map/array coercion is a derived view, not parse-time mutation.
 
 ## Required parity checks before merge
 1. Every new grammar/recovery feature must include at least one strict-mode and one permissive-mode test if a mode gate exists.

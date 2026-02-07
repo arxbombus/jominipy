@@ -2,9 +2,13 @@
 
 from jominipy.ast.lower import lower_tree, parse_to_ast
 from jominipy.ast.model import (
+    AstArrayValue,
     AstBlock,
     AstError,
     AstKeyValue,
+    AstObject,
+    AstObjectMultimap,
+    AstObjectValue,
     AstScalar,
     AstSourceFile,
     AstStatement,
@@ -21,9 +25,13 @@ from jominipy.ast.scalar import (
 )
 
 __all__ = [
+    "AstArrayValue",
     "AstBlock",
     "AstError",
     "AstKeyValue",
+    "AstObject",
+    "AstObjectMultimap",
+    "AstObjectValue",
     "AstScalar",
     "AstSourceFile",
     "AstStatement",

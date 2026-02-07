@@ -1,5 +1,48 @@
 # Handoff
 
+## 2026-02-07 Update: Phase 1 (AST block/list coercion) landed
+- Implemented in `jominipy/ast/model.py`:
+  - block-shape helpers: `is_object_like`, `is_array_like`, `is_mixed`, `is_empty_ambiguous`
+  - derived coercion helpers: `to_object(multimap=False)`, `to_object(multimap=True)`, `to_array()`
+  - typed object/multimap overloads for `to_object(...)`
+- Added AST coverage in `tests/test_ast.py` for:
+  - object-like/array-like/mixed/empty classification
+  - repeated-key coercion policy (`modifier`) with stable ordering
+  - coercion guardrails and empty-block behavior
+- Validation:
+  - `uv run pytest -q tests/test_ast.py tests/test_parser.py tests/test_lexer.py`
+  - `209 passed`
+- Parser/CST contracts unchanged; Phase 1 is AST-derived-view only.
+
+## 2026-02-07 Update: AST v1 landed + centralized tests
+- AST v1 is now implemented:
+  - `jominipy/ast/model.py`
+  - `jominipy/ast/scalar.py`
+  - `jominipy/ast/lower.py`
+  - `jominipy/ast/__init__.py`
+- Centralized test cases/debug utilities are now implemented:
+  - `tests/_shared_cases.py`
+  - `tests/_debug.py`
+  - cross-pipeline parameterized sweeps in lexer/parser/ast tests
+- Current test status:
+  - `206 passed` across `tests/test_lexer.py tests/test_parser.py tests/test_ast.py`
+- See `docs/NEXT_AGENT_ROADMAP.md` for phased implementation plan.
+
+## Repeated-key coercion policy (AST)
+For Jomini objects that repeat keys (e.g. repeated `modifier` in one block), the next agent should keep two levels:
+1. Canonical AST (always):
+   - preserve exact ordered `AstKeyValue` statements, no implicit merging.
+2. Derived coercion views (for consumers):
+   - default object coercion: last-write-wins map.
+   - multimap coercion: repeated keys become ordered arrays.
+
+Concrete example:
+- Input has:
+  - `modifier={ country_revolt_factor = 0.5 }`
+  - `modifier={ country_pop_unrest=0.25 }`
+- Multimap view should expose:
+  - `modifier -> [AstBlock(...), AstBlock(...)]`
+
 ## Current State
 - Lexer (`jominipy/lexer/lexer.py`)
   - Trivia + non-trivia tokenization is lossless.
@@ -58,45 +101,11 @@
 - Lint status was recently autofixed with Ruff:
   - `uv run ruff check --fix`
 
-## Next Task: AST Implementation (Unblocked)
-### Goal
-Implement a first AST layer over CST without changing parser/CST contracts.
+## Next Task
+Follow `docs/NEXT_AGENT_ROADMAP.md` starting with **Phase 2** (scalar interpretation policy hardening) without changing parser/CST contracts.
 
-### Required constraints
-1. CST remains source-of-truth and lossless (no AST-driven parsing changes).
-2. AST performs delayed interpretation for scalars (bool/date-like/number/string).
-3. Do not change strict/permissive parser behavior while implementing AST.
-
-### Suggested AST plan
-1. Add `jominipy/ast/model.py`
-   - dataclass AST node types:
-     - `AstSourceFile`
-     - `AstStatement` (sum type)
-     - `AstKeyValue`
-     - `AstBlock`
-     - `AstScalar`
-     - `AstTaggedBlockValue`
-2. Add `jominipy/ast/scalar.py`
-   - delayed coercion helpers:
-     - `parse_bool(text) -> bool | None`
-     - `parse_number(text) -> int | float | None`
-     - `parse_date_like(text) -> tuple[int, int, int] | None` (or small typed wrapper)
-   - keep original raw text in AST scalar payload.
-3. Add `jominipy/ast/lower.py`
-   - transform CST nodes (`JominiSyntaxKind.*`) into AST nodes.
-   - tolerate `ERROR` nodes by skipping or wrapping as recoverable AST “unknown/error” nodes.
-4. Add AST tests (`tests/test_ast.py`)
-   - CST -> AST shape tests for:
-     - simple key/value
-     - nested blocks
-     - tagged block values
-     - date-like scalar delayed interpretation
-     - quoted vs unquoted scalar distinction preserved
-   - recovery tolerance tests for malformed input (AST still builds from partial CST).
-5. Documentation updates
-   - update `docs/ARCHITECTURE.md` and `docs/BIOME_PARITY.md` AST rows after AST is implemented.
-
-### Start points
-- CST entrypoint: `parse_jomini` in `jominipy/parser/jomini.py`
-- Kind mapping and node vocabulary: `jominipy/syntax/kind.py`
-- Green CST structure: `jominipy/cst/green.py`
+Suggested next command sequence:
+1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py`
+2. Implement Phase 2 only.
+3. `uv run ruff check tests jominipy`
+4. Re-run targeted tests, then the full test trio.

@@ -48,7 +48,10 @@ The design goal is not “parsing that works”, but a system that is:
 - Implemented parser modes: `strict` and `permissive` (`parser/options.py`).
 - Implemented parser recovery: token-set based recovery into `ERROR` nodes, with line-break recovery support.
 - Implemented parser-level checkpoints/rewind and speculative-parse guards.
-- Deferred by design: AST layer (`jominipy/ast/`), until CST/parser behavior is finalized.
+- Implemented AST v1: `ast/model.py`, `ast/scalar.py`, `ast/lower.py` (typed CST-lowering with delayed scalar interpretation).
+- Implemented AST Phase 1 coercion utilities on `AstBlock`: shape classification and derived object/array coercion views (including repeated-key multimap).
+- Implemented centralized cross-pipeline test cases and debug helpers: `tests/_shared_cases.py`, `tests/_debug.py`.
+- Remaining major gap: red CST wrappers; next AST focus is scalar policy hardening (Phase 2).
 
 ## jominipy types (current and intended)
 The types below are chosen to mirror Biome’s *two-phase trivia model* and to prevent common category errors.
@@ -190,27 +193,21 @@ Paths below are relative to the repository root.
   - `tree_sink.py`: lossless sink (implemented)
 - `jominipy/jominipy/cst/`
   - `green.py`: green storage + builder (implemented)
-  - red wrappers: planned
+  - red wrappers: planned (next major parity milestone)
 - `jominipy/jominipy/ast/`
-  - typed AST wrappers (planned; intentionally deferred)
+  - typed AST wrappers/lowering (implemented v1)
+  - block/list/mixed coercion helpers (implemented Phase 1)
+  - scalar policy hardening (next: Phase 2)
 
 ## Next steps
-1. Finalize parser/CST contract before AST:
-   - lock strict/permissive policy per edge case
-   - keep `docs/EDGE_CASES_FAILURE.md` and tests in sync
-2. Improve Biome parity in parser mechanics:
-   - add explicit parser checkpoints/rewind/speculative parsing API at parser level
-   - keep `ParseNodeList` as the active abstraction for Jomini statement/block lists
-   - defer `ParseSeparatedList` until a concrete separator-driven grammar use case is introduced
-3. Expand recovery tests:
+1. Harden scalar interpretation policy:
+   - formalize quoted/unquoted coercion behavior and ambiguous scalar handling
+2. Expand recovery tests:
    - assert `ERROR` node placement and continued parse after malformed input
-4. Add red CST wrappers:
+3. Add red CST wrappers:
    - typed navigation/query API over green nodes/tokens
-5. Implement AST (after the above are stable):
-   - typed wrappers over CST
-   - delayed scalar interpretation (bool/number/date-like/string)
-   - preserve CST as source of truth for formatting
-6. Maintain explicit parity tracking:
+4. Port AST lowering to red wrappers after wrapper API stabilizes.
+5. Maintain explicit parity tracking:
    - update `docs/BIOME_PARITY.md` for each parser/CST/AST feature change
    - record any intentional deviations with rationale and tests
 
