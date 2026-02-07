@@ -31,8 +31,8 @@ For every parser/CST/AST feature, record:
 
 | Area | Biome reference | jominipy | Status | Notes |
 |---|---|---|---|---|
-| Parse result carrier | `biome_js_parser/src/parse.rs` (`Parse<T>`, `parse_js_with_cache`) | `jominipy/parser/jomini.py` + `jominipy/parser/tree_sink.py` | adapted | `ParsedGreenTree` already carries root + diagnostics; next step is consumer-friendly AST-facing carrier/view |
-| Typed consumer surface | `biome_js_syntax` generated typed wrappers (`generated::*`) | `jominipy/ast/model.py` + planned `jominipy/ast/views.py` | pending | AST model exists; dedicated consumer/query API is the next gap |
+| Parse result carrier | `biome_js_parser/src/parse.rs` (`Parse<T>`, `parse_js_with_cache`) | `jominipy/parser/jomini.py` + `jominipy/parser/tree_sink.py` | adapted | `ParsedGreenTree` already carries root + diagnostics; AST consumer views landed, but a dedicated parse-result carrier API for downstream tools is still pending |
+| Typed consumer surface | `biome_js_syntax` generated typed wrappers (`generated::*`) | `jominipy/ast/model.py` + `jominipy/ast/views.py` | adapted | Canonical AST remains source-of-truth; `AstBlockView` adds explicit `as_object`/`as_multimap`/`as_array` and scalar helpers with quoted-default interpretation policy; central-case view/debug coverage added in `tests/test_ast_views.py` |
 | Analyzer entry on shared root | `biome_js_analyze/src/lib.rs` (`analyze`, `LanguageRoot<JsLanguage>`) | pending linter integration | pending | Linter should consume a single parse/lower result, not re-walk raw CST ad hoc |
 | Formatter entry on shared root | `biome_js_formatter/src/lib.rs` (`FormatNodeRule`, `format_node`) | pending formatter integration | pending | Formatter should consume stable typed views while preserving CST as formatting source-of-truth |
 | Service-level orchestration | `biome_service/src/file_handlers/javascript.rs` | pending CLI/service orchestration | pending | Future jominipy service layer should centralize parser/lower/analyze/format pipeline |

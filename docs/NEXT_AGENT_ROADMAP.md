@@ -114,7 +114,7 @@ Status:
 - Biome parity alignment:
   - parser diagnostic de-duplication at same position now matches Biome behavior.
 
-## AST Consumer Follow-on (after Phase 4)
+## AST Consumer Follow-on (after Phase 4) (completed)
 Goal: actively consume Phase 1 model aliases in downstream AST APIs.
 
 Deliverables:
@@ -144,20 +144,21 @@ Biome-practical implementation guidance:
 5. Prepare for future linter/formatter integration:
    - consumer API should be safe for repeated use from multiple tools without side effects.
 
-Suggested execution plan for next agent (single phase):
-1. Add `jominipy/ast/views.py` with:
-   - `AstBlockView` (wraps `AstBlock`)
-   - object/multimap/array accessors
-   - scalar helper accessors that preserve quoted-default interpretation policy
-2. Add `tests/test_ast_views.py`:
-   - shape/view selection tests
-   - repeated-key `modifier` multimap behavior
-   - deterministic behavior for mixed and empty blocks
-   - quoted vs unquoted scalar helper behavior
-3. Keep `tests/test_ast.py` focused on core lowering/model semantics and move consumer assertions into `test_ast_views.py`.
-4. Update docs:
-   - `docs/BIOME_PARITY.md` consumer integration row statuses
-   - `docs/HANDOFF.md` with next command sequence and any constraints discovered
+Status:
+- Implemented `jominipy/ast/views.py` with `AstBlockView`:
+  - explicit `as_object()`, `as_multimap()`, `as_array()` accessors
+  - scalar helper accessors (`get_scalar`, `get_scalar_all`) that delegate to `interpret_scalar` and preserve quoted-default behavior unless `allow_quoted=True`
+- Added `tests/test_ast_views.py` for:
+  - shape/view selection across object/array/mixed/empty blocks
+  - repeated-key `modifier` multimap ordering and last-write-wins object view
+  - quoted vs unquoted scalar helper behavior
+  - deterministic mixed/non-scalar behavior contracts
+- Added central-case view coverage and debug output pathing:
+  - `test_ast_views_runs_all_central_cases` (over `ALL_JOMINI_CASES`)
+  - readable, path-labeled AST view dumps via `tests/_debug.py`
+- Kept parser/CST behavior unchanged.
+- Kept `tests/test_ast.py` focused on core lowering/model semantics and moved consumer view assertions into `tests/test_ast_views.py`.
+- Updated docs (`ARCHITECTURE`, `BIOME_PARITY`, `HANDOFF`) to reflect parity and execution state.
 
 ## Phase 5: Docs and parity governance
 Goal: keep architecture and parity docs accurate after each phase.
@@ -170,8 +171,8 @@ Deliverables each phase:
 
 ## Suggested command sequence for next agent
 1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py`
-2. Implement one phase only (start with AST Consumer Follow-on).
-3. `uv run ruff check tests jominipy`
-4. `uv run pyrefly check`
-5. Re-run targeted tests for changed modules, then full test trio again.
-6. After AST consumer APIs land, update docs and handoff with next sequencing.
+2. Add parse-result carrier ergonomics for downstream consumers, then start linter/formatter integration from shared parse/lower + `AstBlockView` entrypoints.
+3. `uv run pytest -q tests/test_ast_views.py tests/test_ast.py`
+4. `uv run ruff check tests jominipy docs`
+5. `uv run pyrefly check`
+6. Re-run targeted tests for changed modules, then full parser/lexer/ast/cst-red suite.

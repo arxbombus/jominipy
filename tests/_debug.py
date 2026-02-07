@@ -5,9 +5,13 @@ from __future__ import annotations
 import os
 
 from jominipy.ast import (
+    AstArrayValue,
     AstBlock,
+    AstBlockView,
     AstError,
     AstKeyValue,
+    AstObject,
+    AstObjectMultimap,
     AstScalar,
     AstSourceFile,
     AstTaggedBlockValue,
@@ -21,6 +25,12 @@ PRINT_CST = os.getenv("PRINT_CST", "0").lower() in {"1", "true", "yes", "on"}
 PRINT_AST = os.getenv("PRINT_AST", "0").lower() in {"1", "true", "yes", "on"}
 PRINT_SOURCE = os.getenv("PRINT_SOURCE", "0").lower() in {"1", "true", "yes", "on"}
 PRINT_DIAGNOSTICS = os.getenv("PRINT_DIAGNOSTICS", "0").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+PRINT_AST_VIEWS = os.getenv("PRINT_AST_VIEWS", "0").lower() in {
     "1",
     "true",
     "yes",
@@ -77,6 +87,20 @@ def debug_dump_diagnostics(test_name: str, diagnostics: list[Diagnostic], source
         return
     for diagnostic in diagnostics:
         print(diagnostic)
+
+
+def debug_dump_ast_block_view(
+    test_name: str,
+    view: AstBlockView,
+    *,
+    source: str | None = None,
+) -> None:
+    if not PRINT_AST_VIEWS:
+        return
+    if source is not None:
+        debug_print_source(test_name, source)
+    print(f"\n===== {test_name} AST VIEW =====")
+    print(_dump_ast_block_view(view))
 
 
 def _dump_cst(node: GreenNode) -> str:
@@ -143,3 +167,69 @@ def _dump_ast(ast: AstSourceFile) -> str:
         walk_statement(statement, 1)
 
     return "\n".join(lines)
+
+
+def _dump_ast_block_view(view: AstBlockView) -> str:
+    object_view = view.as_object()
+    multimap_view = view.as_multimap()
+    array_view = view.as_array()
+
+    lines: list[str] = [
+        "shape:",
+        f"  object_like: {view.is_object_like}",
+        f"  array_like: {view.is_array_like}",
+        f"  mixed: {view.is_mixed}",
+        f"  empty_ambiguous: {view.is_empty_ambiguous}",
+        "views:",
+        f"  as_object: {_format_object_view(object_view)}",
+        f"  as_multimap: {_format_multimap_view(multimap_view)}",
+        f"  as_array: {_format_array_view(array_view)}",
+    ]
+    return "\n".join(lines)
+
+
+def _format_object_view(value: AstObject | None) -> str:
+    if value is None:
+        return "None"
+    if not value:
+        return "{}"
+    parts = [f"{key}={_format_ast_value(item)}" for key, item in value.items()]
+    return "{ " + ", ".join(parts) + " }"
+
+
+def _format_multimap_view(value: AstObjectMultimap | None) -> str:
+    if value is None:
+        return "None"
+    if not value:
+        return "{}"
+    parts: list[str] = []
+    for key, items in value.items():
+        rendered = ", ".join(_format_ast_value(item) for item in items)
+        parts.append(f"{key}=[{rendered}]")
+    return "{ " + ", ".join(parts) + " }"
+
+
+def _format_array_view(value: list[AstArrayValue] | None) -> str:
+    if value is None:
+        return "None"
+    if not value:
+        return "[]"
+    rendered = ", ".join(_format_ast_value(item) for item in value)
+    return "[" + rendered + "]"
+
+
+def _format_ast_value(value: object) -> str:
+    if value is None:
+        return "None"
+    if isinstance(value, AstScalar):
+        suffix = " (quoted)" if value.was_quoted else ""
+        return f"Scalar({value.raw_text!r}{suffix})"
+    if isinstance(value, AstBlock):
+        return f"Block(len={len(value.statements)})"
+    if isinstance(value, AstTaggedBlockValue):
+        return f"Tagged(tag={value.tag.raw_text!r}, block_len={len(value.block.statements)})"
+    if isinstance(value, AstKeyValue):
+        return f"KeyValue({value.key.raw_text!r})"
+    if isinstance(value, AstError):
+        return f"Error({value.raw_text!r})"
+    return repr(value)

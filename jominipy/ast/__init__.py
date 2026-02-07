@@ -24,10 +24,12 @@ from jominipy.ast.scalar import (
     parse_date_like,
     parse_number,
 )
+from jominipy.ast.views import AstBlockView
 
 __all__ = [
     "AstArrayValue",
     "AstBlock",
+    "AstBlockView",
     "AstError",
     "AstKeyValue",
     "AstObject",

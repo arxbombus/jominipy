@@ -59,7 +59,8 @@ The design goal is not “parsing that works”, but a system that is:
 - Implemented AST Phase 2 scalar hardening in `ast/scalar.py`: explicit scalar kind model (`unknown`/`bool`/`number`/`date_like`) and quoted-default non-coercion with opt-in coercion.
 - Implemented Phase 3 red wrappers in `cst/red.py` and migrated AST lowering to wrappers in `ast/lower.py`.
 - Implemented centralized cross-pipeline test cases and debug helpers: `tests/_shared_cases.py`, `tests/_debug.py`.
-- Remaining major gap: AST consumer follow-on APIs over Phase 1/2/3 AST foundations.
+- Implemented AST consumer follow-on API: `ast/views.py` (`AstBlockView`) with explicit object/multimap/array accessors and scalar interpretation helpers over canonical AST.
+- Remaining major gap: linter/formatter/CLI integration over shared parse/lower results and AST consumer views.
 
 ## jominipy types (current and intended)
 The types below are chosen to mirror Biome’s *two-phase trivia model* and to prevent common category errors.
@@ -228,11 +229,12 @@ Paths below are relative to the repository root.
   - block/list/mixed coercion helpers (implemented Phase 1)
   - scalar policy hardening (implemented Phase 2)
   - lowering ported to red wrappers (implemented Phase 3)
+  - consumer view/query surface (`views.py`, implemented Phase 5)
 
 ## Next steps
-1. Build AST consumer/query surface:
-   - add `jominipy/ast/views.py` over existing `AstBlock` coercion helpers
-   - add `tests/test_ast_views.py` for object/multimap/array consumers
+1. Build linter/formatter/CLI integration over shared parse/lower + AST views:
+   - keep one parse/lower lifecycle and reuse typed consumer views
+   - avoid ad hoc raw CST structural re-derivation in tool entrypoints
 2. Maintain explicit parity tracking:
    - update `docs/BIOME_PARITY.md` for each parser/CST/AST feature change
    - record any intentional deviations with rationale and tests
