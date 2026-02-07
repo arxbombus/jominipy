@@ -68,7 +68,7 @@ Status:
   - quoted default vs opt-in coercion coverage
   - large integer and sign handling coverage
 
-## Phase 3: Red CST wrappers (Biome parity priority)
+## Phase 3: Red CST wrappers (Biome parity priority) (completed)
 Goal: stop doing manual green-tree walking in high-level code.
 
 Deliverables:
@@ -81,6 +81,18 @@ Tests:
 - Navigation/text/trivia correctness tests.
 - AST parity tests before/after port (no behavior changes).
 
+Status:
+- Implemented red wrappers in `jominipy/cst/red.py`:
+  - `SyntaxNode` / `SyntaxToken` wrappers
+  - parent/children/sibling navigation
+  - descendant token iteration
+  - token text/trivia accessors (`text_with_trivia`, `text_trimmed`, leading/trailing trivia text)
+- Exported wrappers via `jominipy/cst/__init__.py`.
+- Ported AST lowering to red wrappers in `jominipy/ast/lower.py`:
+  - added `lower_syntax_tree(...)`
+  - `parse_to_ast(...)` and `lower_tree(...)` now lower through red wrappers
+- Added red-wrapper tests in `tests/test_cst_red.py`.
+
 ## Phase 4: Recovery/diagnostic hardening
 Goal: robust parse under malformed real-world input.
 
@@ -90,6 +102,24 @@ Deliverables:
    - `ERROR` node placement is stable
    - parse continues after error
    - diagnostics stay deterministic in strict/permissive modes
+
+## AST Consumer Follow-on (after Phase 4)
+Goal: actively consume Phase 1 model aliases in downstream AST APIs.
+
+Deliverables:
+1. Add `jominipy/ast/views.py` as consumer/query surface over `AstBlock` coercions.
+2. Expose typed helpers that return:
+   - `AstObject` / `AstObjectMultimap` for object views
+   - `list[AstArrayValue]` for array views
+3. Add tests (e.g. `tests/test_ast_views.py`) covering:
+   - object/array/mixed/empty classification and coercion
+   - repeated-key multimap behavior
+   - quoted vs unquoted scalar interpretation through consumer helpers
+
+Constraints:
+- No parser/CST behavior changes.
+- Canonical AST ordering stays source-of-truth; all object/array forms remain derived views.
+- Keep Biome parity boundaries explicit in `docs/BIOME_PARITY.md`.
 
 ## Phase 5: Docs and parity governance
 Goal: keep architecture and parity docs accurate after each phase.
@@ -101,7 +131,9 @@ Deliverables each phase:
 4. Add a short handoff section in `docs/HANDOFF.md` with exact next command sequence.
 
 ## Suggested command sequence for next agent
-1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py`
-2. Implement one phase only (start with Phase 3).
+1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py`
+2. Implement one phase only (start with Phase 4).
 3. `uv run ruff check tests jominipy`
-4. Re-run targeted tests for changed modules, then full test trio again.
+4. `uv run pyrefly check`
+5. Re-run targeted tests for changed modules, then full test trio again.
+6. After Phase 4 lands, begin AST Consumer Follow-on scope.

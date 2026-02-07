@@ -23,8 +23,8 @@ For every parser/CST/AST feature, record:
 | Parser checkpoint/rewind | `biome_parser/src/lib.rs` | `jominipy/parser/parser.py` | adapted | Parser-level checkpoint object implemented |
 | Speculative parsing guard | `biome_parser/src/lib.rs` | `jominipy/parser/parser.py` | adapted | Context-managed speculative depth implemented |
 | Mode/feature gating | Biome feature support traits/options | `jominipy/parser/options.py` + `grammar.py` | adapted | Explicit mode/feature flags with grammar gates |
-| AST typed layer | Biome syntax wrappers/typed nodes | `jominipy/ast/*` | adapted | AST v1 + Phase 1/2 implemented (`model`, `scalar`, `lower`); preserves CST-first semantics, delayed interpretation, and explicit scalar kind modeling |
-| Red CST wrappers | Biome red syntax wrappers | `jominipy/cst/*` (planned) | pending | Green CST exists; red-layer navigation/query wrappers are next major parity gap |
+| AST typed layer | Biome syntax wrappers/typed nodes | `jominipy/ast/*` | adapted | AST v1 + Phase 1/2/3 implemented (`model`, `scalar`, `lower`); lowering now runs through red wrappers while preserving CST-first semantics |
+| Red CST wrappers | Biome red syntax wrappers | `jominipy/cst/red.py` + `jominipy/cst/__init__.py` | adapted | `SyntaxNode`/`SyntaxToken` wrappers implemented with navigation and token text/trivia accessors; current scope is read-only traversal/query API |
 | Block/list coercion policy | Biome typed-node semantic utilities | `jominipy/ast/*` | adapted | Canonical AST preserves statement order; derived object/array/mixed coercion helpers landed on `AstBlock` (last-write-wins + multimap modes) |
 
 ## Intentional deviations (must stay explicit)

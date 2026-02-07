@@ -2,6 +2,12 @@
 
 This document defines the architecture we are implementing in jominipy.
 
+## Doc Ownership
+- This file is for stable architecture and invariants.
+- Do not store phase-by-phase handoff logs here.
+- Current execution status belongs in `docs/HANDOFF.md`.
+- Forward plan belongs in `docs/NEXT_AGENT_ROADMAP.md`.
+
 ## Toolchain scope (Biome-style)
 jominipy is a Biome-style toolchain for Paradox game scripts (Jomini/Clausewitz). The library provides:
 - Parser
@@ -51,8 +57,9 @@ The design goal is not “parsing that works”, but a system that is:
 - Implemented AST v1: `ast/model.py`, `ast/scalar.py`, `ast/lower.py` (typed CST-lowering with delayed scalar interpretation).
 - Implemented AST Phase 1 coercion utilities on `AstBlock`: shape classification and derived object/array coercion views (including repeated-key multimap).
 - Implemented AST Phase 2 scalar hardening in `ast/scalar.py`: explicit scalar kind model (`unknown`/`bool`/`number`/`date_like`) and quoted-default non-coercion with opt-in coercion.
+- Implemented Phase 3 red wrappers in `cst/red.py` and migrated AST lowering to wrappers in `ast/lower.py`.
 - Implemented centralized cross-pipeline test cases and debug helpers: `tests/_shared_cases.py`, `tests/_debug.py`.
-- Remaining major gap: red CST wrappers and AST lowering migration to red wrappers.
+- Remaining major gap: recovery/diagnostic hardening coverage.
 
 ## jominipy types (current and intended)
 The types below are chosen to mirror Biome’s *two-phase trivia model* and to prevent common category errors.
@@ -150,7 +157,7 @@ TreeBuilder consumes start/finish/token-with-trivia operations and builds a gree
 Green CST stores:
 - Nodes and tokens, immutable.
 - Leading/trailing trivia as lists of `TriviaPiece` (kind + length).
-- Token text slices (so trivia text can always be recovered by slicing).
+- Token text (without trivia) plus trivia piece lengths; red wrappers recover trivia text by slicing the original source with computed token offsets.
 
 Red wrappers provide:
 - Navigation (parent/children/siblings, token iteration).
@@ -158,7 +165,7 @@ Red wrappers provide:
   - token.text_with_trivia
   - token.text_trimmed
 - Trivia queries:
-  - leading_trivia / trailing_trivia views that iterate pieces and slice the underlying token text.
+  - leading_trivia / trailing_trivia views that iterate pieces and slice the original source text.
 
 ## 7) AST
 The AST is a typed view over red CST nodes.
@@ -194,19 +201,17 @@ Paths below are relative to the repository root.
   - `tree_sink.py`: lossless sink (implemented)
 - `jominipy/jominipy/cst/`
   - `green.py`: green storage + builder (implemented)
-  - red wrappers: planned (next major parity milestone)
+  - `red.py`: red wrappers (implemented Phase 3)
 - `jominipy/jominipy/ast/`
   - typed AST wrappers/lowering (implemented v1)
   - block/list/mixed coercion helpers (implemented Phase 1)
   - scalar policy hardening (implemented Phase 2)
+  - lowering ported to red wrappers (implemented Phase 3)
 
 ## Next steps
-1. Add red CST wrappers:
-   - typed navigation/query API over green nodes/tokens
-2. Port AST lowering to red wrappers after wrapper API stabilizes.
-3. Expand recovery tests:
+1. Expand recovery tests:
    - assert `ERROR` node placement and continued parse after malformed input
-4. Maintain explicit parity tracking:
+2. Maintain explicit parity tracking:
    - update `docs/BIOME_PARITY.md` for each parser/CST/AST feature change
    - record any intentional deviations with rationale and tests
 
