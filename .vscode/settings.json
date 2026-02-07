@@ -29,7 +29,8 @@
 		"genderportrait",
 		"soundcategory",
 		"soundeffect",
-		"popleft"
+		"popleft",
+		"savegame"
 	],
 	"FSharp.suggestGitignore": false
 }

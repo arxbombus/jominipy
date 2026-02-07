@@ -1,27 +1,23 @@
-import textwrap
+import pytest
 
-from jominipy.lexer import Lexer, TokenFlags, TokenKind, dump_tokens, token_text
+from jominipy.lexer import Lexer, Token, TokenFlags, TokenKind, token_text
+from tests._debug import debug_dump_diagnostics, debug_dump_tokens
+from tests._shared_cases import (
+    ALL_JOMINI_CASES,
+    JominiCase,
+    case_id,
+    case_source,
+)
 
 
-def lex(text: str):
+def lex(text: str) -> list[Token]:
     lexer = Lexer(text)
     return lexer.lex()
 
 
 # 1) Simple campaign_stats block
 def test_campaign_stats_minimal_block():
-    src = textwrap.dedent(
-        """
-        campaign_stats={
-        {
-                id=0
-            }
-        {
-                id=1
-            }
-        }
-        """
-    ).lstrip()
+    src = case_source("campaign_stats_minimal_block")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -55,24 +51,7 @@ def test_campaign_stats_minimal_block():
 
 # 2) CK3 meta_data blob
 def test_meta_data_core_fields_lex_correctly():
-    src = textwrap.dedent(
-        """
-        meta_data={
-            save_game_version=3
-            version="1.0.3"
-            portraits_version=3
-            meta_date=1066.9.15
-            meta_player_name="Chieftain Botulf"
-            meta_title_name="Chiefdom of Jåhkåmåhkke"
-            meta_coat_of_arms={
-                pattern="pattern_solid.dds"
-                color1=yellow
-                color2=black
-            }
-            meta_number_of_players=1
-        }
-        """
-    ).lstrip()
+    src = case_source("meta_data_core_fields_lex_correctly")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -109,39 +88,7 @@ def test_meta_data_core_fields_lex_correctly():
 
 # 3) EU4-style CWT save header + campaign_stats
 def test_eu4_header_and_campaign_stats():
-    src = textwrap.dedent(
-        """
-        EU4txt
-        date=1444.11.11
-        save_game=".eu4"
-        player="ENG"
-        displayed_country_name="England"
-        save_game_version={
-            first=1
-            second=28
-            third=3
-            forth=0
-            name="Spain"
-        }
-        campaign_stats={
-        {
-                id=0
-                comparison=1
-                key="game_country"
-                selector="ENG"
-                localization="England"
-            }
-        {
-                id=12
-                comparison=0
-                key="best_leader"
-                localization="§GRichard Plantagenet§! ( 2 / 4 / 3 / 0 )"
-                value=15.000
-            }
-        }
-        checksum="e6b8bef618f45668d6d0165df3fcd089"
-        """
-    ).lstrip()
+    src = case_source("eu4_header_and_campaign_stats")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -188,7 +135,7 @@ def test_eu4_header_and_campaign_stats():
 
 # 4) Dense inline numeric/boolean block
 def test_dense_inline_numeric_boolean_block():
-    src = "868416617618464 = { 11777 4108 { 5632 4187=1089 10={ no true 45056 { 0=true } } 0=1089 } }"
+    src = case_source("dense_inline_numeric_boolean_block")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -220,17 +167,7 @@ def test_dense_inline_numeric_boolean_block():
 
 # 5) savegame_version block
 def test_savegame_version_block():
-    src = textwrap.dedent(
-        """
-        savegame_version={
-            first=1
-            second=29
-            third=5
-            forth=0
-            name="Manchu"
-        }
-        """
-    ).lstrip()
+    src = case_source("savegame_version_block")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -251,14 +188,7 @@ def test_savegame_version_block():
 
 
 def test_ck3_style_gene_block_structure():
-    src = """
-    genes={
-        hair_color={ 14 246 14 246 }
-        skin_color={ 24 89 24 89 }
-        gene_chin_forward={ "chin_forward_pos" 147 "chin_forward_pos" 147 }
-        gene_eye_angle={ "eye_angle_pos" 129 "eye_angle_pos" 129 }
-    }
-    """.lstrip()
+    src = case_source("ck3_style_gene_block_structure")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -297,12 +227,7 @@ def test_ck3_style_gene_block_structure():
 
 
 def test_unary_and_binary_plus_minus_operators():
-    src = """
-    value=-5
-    bonus=+3
-    sum=1+2
-    diff=10-4
-    """.lstrip()
+    src = case_source("unary_and_binary_plus_minus_operators")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -339,13 +264,7 @@ def test_unary_and_binary_plus_minus_operators():
 
 
 def test_multi_char_comparison_operators():
-    src = """
-    a>=10
-    b<=5
-    c!=3
-    d==4
-    e?=7
-    """.lstrip()
+    src = case_source("multi_char_comparison_operators")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -381,7 +300,7 @@ def test_multi_char_comparison_operators():
 
 
 def test_newline_flag_on_next_token():
-    src = "a=1\r\nb=2\nc=3\r\nd=4"
+    src = case_source("newline_flag_on_next_token")
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
 
@@ -400,12 +319,7 @@ def test_newline_flag_on_next_token():
 
 
 def test_comments_are_tokens():
-    src = """
-    # full line comment
-    x=1 # trailing comment
-    # another
-    y = 2
-    """.lstrip()
+    src = case_source("comments_are_tokens")
 
     tokens = lex(src)
 
@@ -416,11 +330,7 @@ def test_comments_are_tokens():
 
 
 def test_dotted_identifiers_and_filenames():
-    src = """
-    file_name="savegame_1444.11.11.eu4"
-    scope_name=my_country.tag
-    texture="ce_pagan_gironny_03.dds"
-    """.lstrip()
+    src = case_source("dotted_identifiers_and_filenames")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -451,7 +361,7 @@ def test_dotted_identifiers_and_filenames():
 
 
 def test_numeric_sequence_with_multiple_dots():
-    src = "meta_date=1066.9.15"
+    src = case_source("numeric_sequence_with_multiple_dots")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -475,10 +385,7 @@ def test_numeric_sequence_with_multiple_dots():
 
 
 def test_complex_quoted_strings_with_formatting():
-    src = r"""
-    description="§GThis is a green §!description with (parentheses), punctuation, and 1.23 numbers.§!"
-    leader_name="§GRichard Plantagenet§! ( 2 / 4 / 3 / 0 )"
-    """.lstrip()
+    src = case_source("complex_quoted_strings_with_formatting")
 
     tokens = lex(src)
     non_trivia = [t for t in tokens if not t.kind.is_trivia]
@@ -499,9 +406,20 @@ def test_complex_quoted_strings_with_formatting():
 
 
 def test_dump_tokens_smoke():
-    src = 'a=1\n# comment\nb="hi\\"there\nhello = world # inline comment\n# comment 2 # I wonder what this does\n# multiline\n# comment"'
-    print(src)
+    src = case_source("dump_tokens_smoke")
     lexer = Lexer(src)
     tokens = lexer.lex()
-    dump_tokens(tokens, src, diagnostics=lexer.diagnostics)
+    debug_dump_tokens("dump_tokens_smoke", src, tokens)
+    debug_dump_diagnostics("dump_tokens_smoke", lexer.diagnostics, source=src)
+    assert tokens[-1].kind == TokenKind.EOF
+
+
+@pytest.mark.parametrize("case", ALL_JOMINI_CASES, ids=case_id)
+def test_lexer_runs_all_central_cases(case: JominiCase) -> None:
+    lexer = Lexer(case.source)
+    tokens = lexer.lex()
+    debug_dump_tokens(f"central::{case.name}", case.source, tokens)
+    debug_dump_diagnostics(f"central::{case.name}", lexer.diagnostics, source=case.source)
+
+    assert tokens
     assert tokens[-1].kind == TokenKind.EOF
