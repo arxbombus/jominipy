@@ -40,9 +40,7 @@ def _collect_node_kinds(root: GreenNode) -> list[JominiSyntaxKind]:
 
 def _statement_list_node(root: GreenNode) -> GreenNode:
     source = next(
-        child
-        for child in root.children
-        if isinstance(child, GreenNode) and child.kind == JominiSyntaxKind.SOURCE_FILE
+        child for child in root.children if isinstance(child, GreenNode) and child.kind == JominiSyntaxKind.SOURCE_FILE
     )
     return next(
         child
@@ -53,11 +51,7 @@ def _statement_list_node(root: GreenNode) -> GreenNode:
 
 def _statement_list_child_kinds(root: GreenNode) -> list[JominiSyntaxKind]:
     statement_list = _statement_list_node(root)
-    return [
-        child.kind
-        for child in statement_list.children
-        if isinstance(child, GreenNode)
-    ]
+    return [child.kind for child in statement_list.children if isinstance(child, GreenNode)]
 
 
 def _collect_tokens(root: GreenNode) -> list[GreenToken]:

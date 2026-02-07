@@ -1,4 +1,4 @@
-"""Parse/lower carrier that mirrors Biome's Parse<T> ergonomics."""
+"""Parse/lower carriers that mirror Biome's Parse<T> ergonomics."""
 
 from __future__ import annotations
 
@@ -17,15 +17,11 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True)
-class JominiParseResult:
-    """Reusable parse result for parse-once/consume-many workflows."""
+class ParseResultBase:
+    """Shared parse carrier for parse-once/consume-many workflows."""
 
     source_text: str
     parsed: ParsedGreenTree
-    options: ParserOptions
-    _syntax_root: SyntaxNode | None = field(default=None, init=False, repr=False)
-    _ast_root: AstSourceFile | None = field(default=None, init=False, repr=False)
-    _root_view: AstBlockView | None = field(default=None, init=False, repr=False)
 
     @property
     def diagnostics(self) -> list[Diagnostic]:
@@ -37,6 +33,16 @@ class JominiParseResult:
 
     def green_root(self) -> GreenNode:
         return self.parsed.root
+
+
+@dataclass(slots=True)
+class JominiParseResult(ParseResultBase):
+    """Jomini game-script parse result with typed syntax/AST/view accessors."""
+
+    options: ParserOptions
+    _syntax_root: SyntaxNode | None = field(default=None, init=False, repr=False)
+    _ast_root: AstSourceFile | None = field(default=None, init=False, repr=False)
+    _root_view: AstBlockView | None = field(default=None, init=False, repr=False)
 
     def syntax_root(self) -> SyntaxNode:
         if self._syntax_root is None:

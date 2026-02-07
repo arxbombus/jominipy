@@ -31,4 +31,3 @@ class CheckRunResult:
     parse: JominiParseResult
     diagnostics: list[Diagnostic]
     has_errors: bool
-

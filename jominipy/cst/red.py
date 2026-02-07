@@ -149,14 +149,10 @@ class SyntaxNode:
         return self._children
 
     def child_nodes(self) -> tuple[SyntaxNode, ...]:
-        return tuple(
-            child for child in self._children if isinstance(child, SyntaxNode)
-        )
+        return tuple(child for child in self._children if isinstance(child, SyntaxNode))
 
     def child_tokens(self) -> tuple[SyntaxToken, ...]:
-        return tuple(
-            child for child in self._children if isinstance(child, SyntaxToken)
-        )
+        return tuple(child for child in self._children if isinstance(child, SyntaxToken))
 
     def descendants_tokens(self) -> tuple[SyntaxToken, ...]:
         tokens: list[SyntaxToken] = []

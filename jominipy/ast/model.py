@@ -53,21 +53,12 @@ class AstBlock:
 
     @property
     def is_object_like(self) -> bool:
-        return (
-            not self.is_empty_ambiguous
-            and all(
-                isinstance(statement, AstKeyValue) for statement in self.statements
-            )
-        )
+        return not self.is_empty_ambiguous and all(isinstance(statement, AstKeyValue) for statement in self.statements)
 
     @property
     def is_array_like(self) -> bool:
-        return (
-            not self.is_empty_ambiguous
-            and all(
-                isinstance(statement, (AstScalar, AstBlock, AstTaggedBlockValue))
-                for statement in self.statements
-            )
+        return not self.is_empty_ambiguous and all(
+            isinstance(statement, (AstScalar, AstBlock, AstTaggedBlockValue)) for statement in self.statements
         )
 
     @property
@@ -75,12 +66,9 @@ class AstBlock:
         if self.is_empty_ambiguous:
             return False
 
-        has_key_values = any(
-            isinstance(statement, AstKeyValue) for statement in self.statements
-        )
+        has_key_values = any(isinstance(statement, AstKeyValue) for statement in self.statements)
         has_array_values = any(
-            isinstance(statement, (AstScalar, AstBlock, AstTaggedBlockValue))
-            for statement in self.statements
+            isinstance(statement, (AstScalar, AstBlock, AstTaggedBlockValue)) for statement in self.statements
         )
         return has_key_values and has_array_values
 

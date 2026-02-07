@@ -169,9 +169,7 @@ def _lower_scalar(node: SyntaxNode) -> AstScalar:
         token_kinds.append(child.kind)
         parts.append(child.text)
 
-    was_quoted = (
-        len(token_kinds) == 1 and token_kinds[0] == JominiSyntaxKind.STRING
-    )
+    was_quoted = len(token_kinds) == 1 and token_kinds[0] == JominiSyntaxKind.STRING
     return AstScalar(
         raw_text="".join(parts),
         token_kinds=tuple(token_kinds),

@@ -6,6 +6,29 @@
 - `docs/ARCHITECTURE.md`: stable architecture/invariants, not day-to-day status churn.
 - `docs/NEXT_AGENT_ROADMAP.md`: forward implementation plan and phase sequencing.
 
+## Agent Update Protocol (required at task end)
+Every agent must perform this checklist before finishing a substantive task:
+1. Update docs that changed in meaning:
+   - `docs/HANDOFF.md` for current state/next step/validation
+   - `docs/BIOME_PARITY.md` for parity status/deviations
+   - `docs/ARCHITECTURE.md` only if architectural invariants or boundaries changed
+   - `docs/NEXT_AGENT_ROADMAP.md` for phase sequencing changes
+2. Update memories:
+   - `handoff_current` must point to the canonical latest timestamped handoff memory
+   - `reference_map` if implementation references changed
+   - `task_completion` if completion checklist changed
+3. Create/refresh a timestamped handoff memory for major progress:
+   - Naming format (required):
+     - `handoff_YYYY-MM-DDTHH-MM-SSZ_<scope>_<status>`
+   - Required status suffix:
+     - `LATEST` for canonical current
+     - `ARCHIVED` for historical snapshots
+4. Keep exactly one canonical latest handoff memory at a time:
+   - `handoff_current` must explicitly name it.
+   - Previous latest handoff must be marked `ARCHIVED` or removed if redundant.
+5. Validation evidence must be recorded in handoff doc/memory:
+   - exact commands and pass/fail results.
+
 ## Current State (as of 2026-02-07)
 - Parser/CST pipeline is stable and unchanged during AST phases.
 - AST phases 1-5 are complete:
@@ -19,6 +42,27 @@
   - `uv run ruff check tests jominipy docs` (passed)
   - `uv run pyrefly check` (`0 errors`)
   - `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py tests/test_ast_views.py` (`228 passed`)
+- Parse-result carrier phase is now implemented:
+  - `jominipy/pipeline/result.py`: `ParseResultBase`, `JominiScriptParseResult`
+  - `jominipy/pipeline/results.py`: `LintRunResult`, `FormatRunResult`, `CheckRunResult`
+  - `jominipy/parser/jomini.py`: new `parse_result(...)` entrypoint
+  - `jominipy/parser/__init__.py`: exports `parse_result`
+- Planning-gate drafting has started in docs:
+  - `docs/NEXT_AGENT_ROADMAP.md` now includes concrete scaffold/API contracts and Phase 0 acceptance criteria.
+  - `docs/BIOME_PARITY.md` now includes planning-gate parity targets and parse-carrier naming/domain boundary policy.
+- Pipeline scaffold draft has landed (no real lint/format rules yet):
+  - `jominipy/pipeline/entrypoints.py`: `run_check`, `run_lint`, `run_format`
+  - `jominipy/lint/runner.py`: lint runner skeleton over shared parse lifecycle
+  - `jominipy/format/runner.py`: formatter runner skeleton over shared parse lifecycle
+  - `tests/test_pipeline_entrypoints.py`: lifecycle and contract coverage
+- Implementation status adjustment:
+  - implementation work is now paused
+  - current focus is completing the full Phase 0 proposal and gating criteria across docs/memories
+- Validation snapshot after carrier work:
+  - `uv run pytest -q tests/test_parse_result.py tests/test_parser.py tests/test_ast.py tests/test_ast_views.py` (`217 passed`)
+  - `uv run pytest -q tests/test_lexer.py tests/test_cst_red.py tests/test_parse_result.py tests/test_parser.py tests/test_ast.py tests/test_ast_views.py` (`286 passed`)
+  - `uv run ruff check tests jominipy docs` (passed)
+  - `uv run pyrefly check` (`0 errors`)
 
 ## AST Consumer Follow-on landed details
 - Added `jominipy/ast/views.py`:
@@ -38,13 +82,19 @@
   - compact value renderers
   - source printed once per central-case run with path-labeled block dumps
 
-## Next Task
-- Immediate next step: implement parse-result carrier ergonomics (Biome `Parse<T>`-style API shape) over current parse/lower outputs.
-- After carrier lands, start consumer integration parity work over one shared parse/lower lifecycle:
-  - add parse-result carrier ergonomics for downstream consumers
-  - consume `AstBlockView` from downstream tool entrypoints
-  - keep parser/CST behavior unchanged
-  - preserve explicit, deterministic coercion boundaries
+## Next Task (post-Phase-0 kickoff)
+- Phase 0 planning gate is complete.
+- Immediate next step: start Phase 1 execution (lint engine core) under the approved proposal constraints.
+- Phase 1 kickoff scope:
+  1. deterministic lint rule registry and execution ordering
+  2. first semantic/domain rule (`start_year` required for HOI4 technology objects)
+  3. first style/layout rules (multiline list/array + configurable field order)
+  4. keep one-parse-lifecycle invariant via `JominiScriptParseResult`
+- Biome parity remains a hard architectural constraint during implementation.
+- Naming boundary decision is now explicit:
+  - game-script carrier is explicitly `JominiParseResult`
+  - shared carrier behavior is `ParseResultBase` for reuse by non-game-specific pipelines
+  - future rules DSL must use a distinct carrier (`RulesParseResult`)
 
 ## Design Expansion Required (do before broad implementation)
 The following topics were discussed and must be deeply expanded in design docs/notes before full implementation:
@@ -62,6 +112,20 @@ The following topics were discussed and must be deeply expanded in design docs/n
    - normalized IR/conversion pipeline while keeping upstream CWTools files as canonical source
    - semantic resolution layer for aliases/enums/scope/cardinality
 
+5. Linter rule categories and autofix model:
+   - separate semantic/domain rules vs style/layout rules
+   - define autofix contracts (deterministic, idempotent, syntax-safe, trivia/comment-safe)
+   - include configurable rules (example: field-order rules per object type/profile)
+
+6. Type checker and linter coexistence:
+   - shared analysis/fact pipeline, separate execution engines and rule namespaces
+   - allow linter rules to consume type facts; prevent checker depending on lint rules
+
+7. Developer API and generated typed models:
+   - evaluate generated dataclass/Pydantic model surfaces over schema IR
+   - define CST/AST-to-model mapping and model-to-edit mapping (round-trip safe)
+   - require transaction/edit layer rather than naive dict->text serialization
+
 ## Biome practical findings (for next agent)
 - Biome composes tools around a shared parse result and typed consumer layer:
   - parse carrier: `biome_js_parser::Parse<T>` (`parse.rs`)
@@ -75,19 +139,24 @@ The following topics were discussed and must be deeply expanded in design docs/n
   - hidden coercion avoided via explicit view methods
 
 ## Proposed implementation sequence (next agent)
-1. Add parse-result carrier APIs for consumer tooling (Biome `Parse<T>`-style ergonomics over existing parse/lower outputs).
-2. Expand design notes for linter/type-checker/formatter/rules-parser boundaries and ownership before broad implementation.
-3. Wire linter entrypoints to consume one parse/lower result + AST views.
-4. Wire formatter entrypoints to consume typed views while keeping CST as formatting source-of-truth.
-5. Add integration tests that prove no duplicate structural interpretation between tool entrypoints.
-6. Update parity + handoff docs after landing.
+1. Planning gate: produce detailed design docs and phased execution plan (no broad feature implementation yet).
+2. Wire entrypoint scaffolds over existing carriers:
+   - `pipeline/entrypoints.py`
+   - `lint/runner.py` scaffold
+   - `format/runner.py` scaffold
+3. Implement lint analyzer/rule engine with deterministic ordering and configurable rule profiles.
+4. Implement formatter rule pipeline with CST/trivia source-of-truth and idempotence guarantees.
+5. Implement type-checker over shared facts with clear ownership boundary vs lint.
+6. Design and stage generated Pythonic model/edit API over schema IR.
+7. Add integration tests proving single parse/lower lifecycle reuse and parity invariants.
+8. Update parity + handoff docs after each phase.
 
 ## Command Sequence
-1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py`
-2. `uv run pytest -q tests/test_ast_views.py tests/test_ast.py`
+1. `uv run pytest -q tests/test_pipeline_entrypoints.py tests/test_parse_result.py tests/test_parser.py tests/test_ast.py tests/test_ast_views.py`
+2. Implement Phase 1 lint engine core over existing scaffolds.
 3. `uv run ruff check tests jominipy docs`
 4. `uv run pyrefly check`
-5. Re-run full parser/lexer/ast/cst-red suite.
+5. Update parity + handoff docs and memories after Phase 1 milestone.
 
 ## Supersedes
 - `docs/archive/HANDOFF_HISTORY_2026-02.md` for earlier phase logs.

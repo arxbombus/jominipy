@@ -31,16 +31,43 @@ For every parser/CST/AST feature, record:
 
 | Area | Biome reference | jominipy | Status | Notes |
 |---|---|---|---|---|
-| Parse result carrier | `biome_js_parser/src/parse.rs` (`Parse<T>`, `parse_js_with_cache`) | `jominipy/parser/jomini.py` + `jominipy/parser/tree_sink.py` | adapted | `ParsedGreenTree` already carries root + diagnostics; AST consumer views landed, but a dedicated parse-result carrier API for downstream tools is still pending |
+| Parse result carrier | `biome_js_parser/src/parse.rs` (`Parse<T>`, `parse_js_with_cache`) | `jominipy/pipeline/result.py` + `jominipy/parser/jomini.py` | adapted | `ParseResultBase` + `JominiScriptParseResult` landed with diagnostics/error-state and cached green/syntax/AST/view accessors; downstream tool orchestration is the next step |
 | Typed consumer surface | `biome_js_syntax` generated typed wrappers (`generated::*`) | `jominipy/ast/model.py` + `jominipy/ast/views.py` | adapted | Canonical AST remains source-of-truth; `AstBlockView` adds explicit `as_object`/`as_multimap`/`as_array` and scalar helpers with quoted-default interpretation policy; central-case view/debug coverage added in `tests/test_ast_views.py` |
 | Analyzer entry on shared root | `biome_js_analyze/src/lib.rs` (`analyze`, `LanguageRoot<JsLanguage>`) | pending linter integration | pending | Linter should consume a single parse/lower result, not re-walk raw CST ad hoc |
 | Formatter entry on shared root | `biome_js_formatter/src/lib.rs` (`FormatNodeRule`, `format_node`) | pending formatter integration | pending | Formatter should consume stable typed views while preserving CST as formatting source-of-truth |
 | Service-level orchestration | `biome_service/src/file_handlers/javascript.rs` | pending CLI/service orchestration | pending | Future jominipy service layer should centralize parser/lower/analyze/format pipeline |
+| Run-result carriers | `biome_service` parse/analyze/format orchestration carriers | `jominipy/pipeline/results.py` | adapted | `LintRunResult`/`FormatRunResult`/`CheckRunResult` landed to enforce one shared parse lifecycle across entrypoints |
+
+## Planning-gate parity targets (next implementation step)
+
+| Area | Biome reference | jominipy target | Status | Notes |
+|---|---|---|---|---|
+| Thin orchestration entrypoints | `biome_service/src/file_handlers/javascript.rs` | `jominipy/pipeline/entrypoints.py` | pending | Must orchestrate parse/lint/format with one shared parse lifecycle |
+| Lint runner boundary | `biome_js_analyze/src/lib.rs`, `registry.rs` | `jominipy/lint/runner.py` | pending | Deterministic rule ordering, category/rule filtering, shared diagnostics model |
+| Formatter runner boundary | `biome_js_formatter/src/lib.rs` | `jominipy/format/runner.py` | pending | CST/trivia remains source-of-truth; AST views only guide decisions |
+| Type-checker boundary | `biome_js_semantic/src/*`, `biome_js_type_info/src/*` | planned `jominipy/typecheck/*` | pending | Shared fact pipeline with strict checker-vs-linter boundary |
+| Rules DSL parsing + generation | `xtask/codegen`, `biome_syntax_codegen/src/*` | planned `jominipy/rules/*` + generation pipeline | pending | Separate DSL parser and normalized IR for generated models/validators |
+
+## Phase 0 parity gate checklist
+1. Every planned subsystem has at least one concrete Biome reference module in this file.
+2. Planned local module boundaries are documented before subsystem implementation.
+3. One-parse-lifecycle invariant is explicitly preserved across lint/format/check/typecheck entrypoints.
+4. Naming boundaries are explicit across domains (`JominiScriptParseResult` vs planned `RulesParseResult`).
+5. Any deviation introduced during implementation must update this document and corresponding tests in the same change.
+
+Phase 0 status:
+- Completed on 2026-02-07.
+- Checklist items above are satisfied at planning level and now govern Phase 1+ implementation.
 
 ## Intentional deviations (must stay explicit)
 - Jomini-specific grammar policy lives in grammar routines (e.g., tagged block values), not in a generic shared grammar crate.
 - Current list helpers include only non-separated lists; `ParseSeparatedList` is intentionally deferred because current Jomini grammar does not rely on comma-separated constructs as a primary form.
 - Repeated keys (e.g. repeated `modifier`) are preserved in canonical AST; any map/array coercion is a derived view, not parse-time mutation.
+- Naming/domain boundary policy:
+  - Game-script pipeline uses `JominiScriptParseResult`.
+  - Shared cross-domain carrier behavior lives in `ParseResultBase`.
+  - Future rules-DSL parsing must use a distinct carrier type name (`RulesParseResult`).
+  - Do not rely on compatibility aliases for this project; rename directly when boundaries become clearer.
 
 ## Required parity checks before merge
 1. Every new grammar/recovery feature must include at least one strict-mode and one permissive-mode test if a mode gate exists.
@@ -48,3 +75,5 @@ For every parser/CST/AST feature, record:
 3. `docs/EDGE_CASES_FAILURE.md` must match current test expectations.
 4. AST work must not begin until parser/CST entries above are `matched` or `adapted` with explicit rationale.
 5. Consumer API changes must document how they map to Biome’s parse-result + typed-wrapper + tool-entry layering.
+6. New lint/type-check/format entrypoints must prove they consume one `JominiScriptParseResult` lifecycle and do not duplicate parse/lower work.
+7. Planning documents for new subsystems must include explicit Biome mapping references before implementation.

@@ -96,8 +96,6 @@ class LosslessTreeSink:
             if not trailing and trivia_end > token_end:
                 break
 
-            self._trivia_pieces.append(
-                TriviaPiece(kind=trivia.kind, length=trivia.range.len())
-            )
+            self._trivia_pieces.append(TriviaPiece(kind=trivia.kind, length=trivia.range.len()))
             self._text_pos = trivia_end
             self._trivia_pos += 1

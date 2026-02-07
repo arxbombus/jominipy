@@ -294,6 +294,4 @@ def _unsupported_parameter_syntax(parser: Parser) -> Diagnostic:
 
 def _is_parameter_syntax_scalar(text: str) -> bool:
     stripped = text.strip()
-    return stripped.startswith("[[") or (
-        len(stripped) >= 2 and stripped.startswith("$") and stripped.endswith("$")
-    )
+    return stripped.startswith("[[") or (len(stripped) >= 2 and stripped.startswith("$") and stripped.endswith("$"))

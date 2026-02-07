@@ -42,10 +42,7 @@ class ParserProgress:
 
     def assert_progressing(self, parser: "Parser") -> None:
         if not self.has_progressed(parser):
-            raise RuntimeError(
-                "Parser stopped making progress at "
-                f"{parser.current.name} {parser.current_range}"
-            )
+            raise RuntimeError(f"Parser stopped making progress at {parser.current.name} {parser.current_range}")
 
 
 class Parser:

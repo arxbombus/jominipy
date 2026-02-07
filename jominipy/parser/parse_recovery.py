@@ -46,9 +46,7 @@ class ParseRecoveryTokenSet:
         return marker.complete(parser, self.node_kind), None
 
     def is_at_recovered(self, parser: "Parser") -> bool:
-        return parser.at_set(self.recovery_set) or (
-            self.line_break and parser.has_preceding_line_break
-        )
+        return parser.at_set(self.recovery_set) or (self.line_break and parser.has_preceding_line_break)
 
 
 from jominipy.parser.parser import Parser

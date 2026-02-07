@@ -60,7 +60,11 @@ The design goal is not “parsing that works”, but a system that is:
 - Implemented Phase 3 red wrappers in `cst/red.py` and migrated AST lowering to wrappers in `ast/lower.py`.
 - Implemented centralized cross-pipeline test cases and debug helpers: `tests/_shared_cases.py`, `tests/_debug.py`.
 - Implemented AST consumer follow-on API: `ast/views.py` (`AstBlockView`) with explicit object/multimap/array accessors and scalar interpretation helpers over canonical AST.
-- Remaining major gap: linter/formatter/CLI integration over shared parse/lower results and AST consumer views.
+- Implemented parse-result carrier API:
+  - `pipeline/result.py` (`ParseResultBase`, `JominiParseResult`)
+  - `pipeline/results.py` (`LintRunResult`, `FormatRunResult`, `CheckRunResult`)
+  - `parser/jomini.py` (`parse_result(...)`)
+- Remaining major gaps: full analyzer/rule engine, formatter rules pipeline, type checker, and CLI/service orchestration over the shared carrier (pipeline/lint/format scaffolds now exist as thin placeholders).
 
 ## jominipy types (current and intended)
 The types below are chosen to mirror Biome’s *two-phase trivia model* and to prevent common category errors.
@@ -198,6 +202,7 @@ Practical shape in Biome:
 Implication for jominipy:
 - AST consumers should be thin, typed query surfaces over canonical AST, not a second parser.
 - Linter/formatter/CLI should consume these views from one parse/lower result rather than re-deriving structure independently.
+- Type checker should share the same parse/fact pipeline, but remain a separate execution engine from lint rules.
 
 ## jomini-specific commitments
 - Comments are trivia (not statements) for CST losslessness and Biome alignment.
@@ -232,18 +237,50 @@ Paths below are relative to the repository root.
   - consumer view/query surface (`views.py`, implemented Phase 5)
 
 ## Next steps
-1. Implement parse-result carrier ergonomics over shared parse/lower artifacts:
-   - one reusable analysis carrier for downstream tooling
-   - explicit ownership/caching boundaries to prevent repeated parsing/lowering
+1. Mandatory planning gate before broad subsystem implementation:
+   - evaluate project-wide roadmap and produce a detailed phased plan
+   - include risks, test strategy, and parity checks per phase
+   - treat Biome parity as a hard constraint
 2. Deepen design before broad tool implementation:
    - linter/type-checker/formatter boundaries and shared-facts model
    - CWTools rules parser + normalized IR pipeline design
-3. Build linter/formatter/CLI integration over shared parse/lower + AST views:
+3. Build linter/formatter/type-checker/CLI integration over shared parse/lower + AST views:
    - keep one parse/lower lifecycle and reuse typed consumer views
    - avoid ad hoc raw CST structural re-derivation in tool entrypoints
+4. Add developer-facing Pythonic APIs using generated models:
+   - generate typed models from schema IR (dataclass/Pydantic strategy)
+   - provide CST-safe edit transaction layer for manipulations/additions/deletions
+   - avoid naive object serialization that loses trivia/comments
 4. Maintain explicit parity tracking:
    - update `docs/BIOME_PARITY.md` for each parser/CST/AST feature change
    - record any intentional deviations with rationale and tests
+
+## Planning-gate enforcement (current)
+- Broad subsystem implementation (full linter engine, formatter rule engine, type checker, rules DSL parser) is gated behind a complete Phase 0 proposal.
+- Existing `pipeline/entrypoints.py`, `lint/runner.py`, and `format/runner.py` are scaffolds only and do not represent completed subsystem architecture.
+- Until Phase 0 is explicitly approved, the repository should prioritize proposal/docs parity and boundary validation over feature expansion.
+
+## Linter and type-checker boundary (required invariant)
+- Shared infrastructure:
+  - parse carrier, AST views, semantic/type fact generation, diagnostic plumbing.
+- Separate engines:
+  - Type checker: type/scope/value-constraint diagnostics.
+  - Linter: style/domain/policy/schema diagnostics.
+- Dependency direction:
+  - Linter may consume type facts.
+  - Type checker must not depend on lint rule execution.
+
+## Autofix model (required invariant)
+- Autofix means a rule emits deterministic machine-applicable edits.
+- Autofixes must be:
+  - deterministic
+  - idempotent
+  - syntax-safe
+  - trivia/comment-safe (or explicitly decline to fix when unsafe)
+
+## Configurable style policy examples
+- Field-order rules should be lint-config driven (per object/profile), not hardcoded.
+- List/array layout policies (for example, disallow single-line arrays) should be style rules; formatter may enforce the same policy in output mode.
 
 ## Practical guidance (engineering discipline)
 - Keep each layer “boringly single-purpose”. If a module starts needing knowledge from two layers, split it.

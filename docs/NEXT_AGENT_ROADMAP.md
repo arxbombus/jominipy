@@ -6,6 +6,92 @@ This roadmap is implementation-first and ordered to minimize rework.
 - Lexer/parser/CST pipeline is stable and Biome-style.
 - AST v1 exists (`jominipy/ast/model.py`, `jominipy/ast/scalar.py`, `jominipy/ast/lower.py`) and lowers from CST.
 - Centralized cross-pipeline cases and debug helpers are in place under `tests/`.
+- Parse-result carrier API is implemented:
+  - `jominipy/pipeline/result.py` (`ParseResultBase`, `JominiScriptParseResult`)
+  - `jominipy/pipeline/results.py` (`LintRunResult`, `FormatRunResult`, `CheckRunResult`)
+  - `jominipy/parser/jomini.py` (`parse_result(...)`)
+
+## Phase 0: Planning Gate (completed)
+Goal: produce a detailed, Biome-aligned project plan before broad subsystem implementation.
+
+Authoritative deliverables (full proposal):
+1. Ownership and subsystem boundaries:
+   - parser/CST/AST ownership and invariants
+   - linter responsibilities (policy/style/domain diagnostics)
+   - type-checker responsibilities (type/scope/value-constraint diagnostics)
+   - formatter responsibilities (CST/trivia-preserving emission)
+   - rules-parser responsibilities (rules DSL to normalized rule IR)
+2. Public API contracts (design-level, before broad implementation):
+   - parse carriers: `ParseResultBase`, `JominiScriptParseResult`, planned `RulesParseResult`
+   - entrypoints: `run_check`, `run_lint`, `run_format`, planned `run_typecheck`
+   - diagnostics contract: severity/category/code consistency and de-dup rules
+   - rule result/fix contract: deterministic and machine-applicable edit model
+3. Rule engine architecture:
+   - deterministic execution ordering and phase separation
+   - rule taxonomy:
+     - semantic/domain rules (required fields, schema/policy constraints)
+     - style/layout rules (ordering, multiline/list formatting policy)
+   - profile/configuration model and enable/disable mechanics
+4. Autofix architecture:
+   - edit payload and application model
+   - safety criteria: syntax-safe, trivia/comment-safe, range-safe
+   - idempotence requirements and explicit no-fix fallback
+5. Type-check architecture and coexistence model:
+   - shared fact pipeline produced once per parse lifecycle
+   - checker independent from linter execution
+   - linter allowed to consume type facts (one-way dependency)
+6. Formatter architecture:
+   - decision layer (AST/views/facts) vs emission layer (CST/tokens/trivia)
+   - idempotence and comment/trivia preservation criteria
+   - alignment with lint style rules and conflict-resolution policy
+7. Rules DSL parser and generation architecture:
+   - parse CWTools-like DSL into normalized IR
+   - semantic resolution layer (aliases/enums/scope/cardinality)
+   - generation outputs: models/validators/selectors/adapters
+   - versioning/update model per game/ruleset
+8. Test strategy matrix:
+   - unit tests per subsystem
+   - integration tests for one-parse-lifecycle guarantees
+   - parity tests against Biome-aligned contracts
+   - idempotence tests (formatter and autofix)
+   - regression fixtures for diagnostics stability
+9. Risk register and mitigation:
+   - parse duplication risk -> enforce parse carrier injection pathways
+   - nondeterministic rule ordering -> canonical registry ordering + tests
+   - trivia/comment corruption -> CST-first edit application + guarded fixes
+   - semantic/style overlap risk -> explicit engine ownership and namespaces
+10. Stop/Go gates:
+   - required evidence to exit Phase 0
+   - required evidence to start each subsystem phase (lint, format, typecheck, rules-parser)
+
+Named API direction (approved):
+- Game-script carrier remains Jomini-specific: `JominiScriptParseResult`.
+- Shared cross-domain behavior remains generic: `ParseResultBase`.
+- Rules parser carrier will be separate: `RulesParseResult`.
+- No compatibility aliases are required for this project; direct renames are acceptable.
+
+Constraints:
+- No broad subsystem implementation during this planning gate.
+- Biome parity is a hard requirement, not a best-effort target.
+
+Phase 0 exit criteria (must all be true):
+1. This document defines all 10 deliverables above with enough detail to implement without re-litigating boundaries.
+2. `docs/BIOME_PARITY.md` maps each planned subsystem to concrete Biome references.
+3. `docs/ARCHITECTURE.md` reflects boundary invariants and planning-gate enforcement.
+4. `docs/HANDOFF.md` points to planning-only next step and explicitly blocks broad subsystem coding.
+5. Memory/handoff state is updated to reflect this proposal as canonical latest planning state.
+
+Status:
+- Completed on 2026-02-07.
+- Phase 0 proposal package is now the canonical planning baseline.
+- Next step is Phase 1 execution kickoff (lint engine core) under the defined gates.
+
+## Phase 0 Execution Order (approved)
+1. Lint engine core (registry, deterministic ordering, first semantic + style rules).
+2. Formatter pipeline core (CST-first emission + idempotence harness).
+3. Type-checker fact model + checker diagnostics.
+4. Rules DSL parser + normalized IR + generation pipeline.
+5. Integration and parity hardening.
 
 ## Phase 1: AST block/list coercion and repeated-key policy (completed)
 Goal: make AST ergonomic for Jomini data access while preserving CST truth.
@@ -168,14 +254,18 @@ Deliverables each phase:
 2. Update `docs/BIOME_PARITY.md` row statuses + rationale.
 3. Keep `docs/EDGE_CASES_FAILURE.md` synchronized with tests/contracts.
 4. Add a short handoff section in `docs/HANDOFF.md` with exact next command sequence.
+5. Run agent closeout protocol for memories:
+   - update `handoff_current` pointer
+   - maintain timestamped `LATEST`/`ARCHIVED` handoff memory naming
+   - refresh `reference_map` when implementation references change
+   - keep `task_completion` checklist current
 
 ## Suggested command sequence for next agent
-1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py`
-2. Add parse-result carrier ergonomics for downstream consumers, then start linter/formatter integration from shared parse/lower + `AstBlockView` entrypoints.
-3. `uv run pytest -q tests/test_ast_views.py tests/test_ast.py`
+1. `uv run pytest -q tests/test_parse_result.py tests/test_parser.py tests/test_ast.py tests/test_ast_views.py`
+2. `uv run pytest -q tests/test_lexer.py tests/test_cst_red.py tests/test_parse_result.py tests/test_parser.py tests/test_ast.py tests/test_ast_views.py`
+3. Produce the planning-gate output (detailed phases + parity mapping + risk/test strategy).
 4. `uv run ruff check tests jominipy docs`
 5. `uv run pyrefly check`
-6. Re-run targeted tests for changed modules, then full parser/lexer/ast/cst-red suite.
 
 ## Design Expansion Required Before Implementation
 The topics below are intentionally marked as **design-first** and must be expanded by subsequent agents before large implementation work:
@@ -205,3 +295,30 @@ The topics below are intentionally marked as **design-first** and must be expand
    - define normalized IR format for parsed rules (recommended generated artifact, not source-of-truth replacement)
    - define semantic resolution pass for aliases/enums/scope/cardinality and integration with linter/type-check layers
    - define versioning/update workflow so upstream maintained CWTools rules remain canonical input
+
+## Additional expansion topics from current discussion (future agents)
+1. Linter engine taxonomy:
+   - separate rule groups for semantic/domain vs style/layout.
+   - examples to support:
+     - required field rules (`start_year` in HOI4 technology objects)
+     - style rules (array/list must be multiline)
+     - configurable field-order rules (for example: `start_year`, `path`, `research_cost`, ...)
+
+2. Autofix contracts:
+   - define fix payload model and application semantics
+   - deterministic/idempotent/syntax-safe/trivia-safe requirements
+   - explicit no-fix fallback when safe fix cannot be guaranteed
+
+3. Type checker coexistence with linter:
+   - shared fact pipeline, separate engines
+   - linter may consume type facts; checker must not depend on lint execution
+
+4. Developer-facing Pythonic API:
+   - expose simple typed objects for common entities (dataclass/Pydantic strategy)
+   - support manipulations/additions/deletions through CST-safe transaction/edit layer
+   - avoid direct object->text serialization that discards trivia/comments
+
+5. Code generation strategy:
+   - generate models, validators, enums, selectors, and CST mapping adapters from canonical schema IR
+   - support strict typed mode + unknown/dynamic fallback for mods/custom fields
+   - version models per game/ruleset and keep generated artifacts non-hand-edited

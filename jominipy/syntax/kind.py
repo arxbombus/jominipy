@@ -78,10 +78,7 @@ class JominiSyntaxKind(IntEnum):
 
     @property
     def is_token(self) -> bool:
-        return (
-            self != JominiSyntaxKind.TOMBSTONE
-            and self.value < JominiSyntaxKind.ROOT.value
-        )
+        return self != JominiSyntaxKind.TOMBSTONE and self.value < JominiSyntaxKind.ROOT.value
 
     @property
     def is_node(self) -> bool:
