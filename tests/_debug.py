@@ -222,8 +222,8 @@ def _format_ast_value(value: object) -> str:
     if value is None:
         return "None"
     if isinstance(value, AstScalar):
-        suffix = " (quoted)" if value.was_quoted else ""
-        return f"Scalar({value.raw_text!r}{suffix})"
+        text = f"quoted({value.raw_text.strip('"')!r})" if value.was_quoted else value.raw_text
+        return f"Scalar({text})"
     if isinstance(value, AstBlock):
         return f"Block(len={len(value.statements)})"
     if isinstance(value, AstTaggedBlockValue):

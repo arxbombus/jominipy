@@ -39,11 +39,28 @@
   - source printed once per central-case run with path-labeled block dumps
 
 ## Next Task
-- Start consumer integration parity work over one shared parse/lower lifecycle:
+- Immediate next step: implement parse-result carrier ergonomics (Biome `Parse<T>`-style API shape) over current parse/lower outputs.
+- After carrier lands, start consumer integration parity work over one shared parse/lower lifecycle:
   - add parse-result carrier ergonomics for downstream consumers
   - consume `AstBlockView` from downstream tool entrypoints
   - keep parser/CST behavior unchanged
   - preserve explicit, deterministic coercion boundaries
+
+## Design Expansion Required (do before broad implementation)
+The following topics were discussed and must be deeply expanded in design docs/notes before full implementation:
+1. Linter architecture:
+   - rule API, diagnostics model, deterministic execution ordering
+   - domain/schema rules (e.g. required `start_year`) as lint/semantic validation concerns
+2. Type checker architecture:
+   - type fact model and single-pass fact generation from AST
+   - boundary: type constraints (type checker) vs policy/required-field constraints (linter)
+3. Formatter architecture:
+   - CST/trivia source-of-truth guarantees and idempotence criteria
+   - integration over shared parse-result carrier without duplicated parsing
+4. CWTools rules parser architecture:
+   - dedicated parser for CWTools DSL (`references/hoi4-rules/Config`)
+   - normalized IR/conversion pipeline while keeping upstream CWTools files as canonical source
+   - semantic resolution layer for aliases/enums/scope/cardinality
 
 ## Biome practical findings (for next agent)
 - Biome composes tools around a shared parse result and typed consumer layer:
@@ -59,10 +76,11 @@
 
 ## Proposed implementation sequence (next agent)
 1. Add parse-result carrier APIs for consumer tooling (Biome `Parse<T>`-style ergonomics over existing parse/lower outputs).
-2. Wire linter entrypoints to consume one parse/lower result + AST views.
-3. Wire formatter entrypoints to consume typed views while keeping CST as formatting source-of-truth.
-4. Add integration tests that prove no duplicate structural interpretation between tool entrypoints.
-5. Update parity + handoff docs after landing.
+2. Expand design notes for linter/type-checker/formatter/rules-parser boundaries and ownership before broad implementation.
+3. Wire linter entrypoints to consume one parse/lower result + AST views.
+4. Wire formatter entrypoints to consume typed views while keeping CST as formatting source-of-truth.
+5. Add integration tests that prove no duplicate structural interpretation between tool entrypoints.
+6. Update parity + handoff docs after landing.
 
 ## Command Sequence
 1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py`

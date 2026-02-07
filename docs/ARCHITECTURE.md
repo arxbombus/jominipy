@@ -232,10 +232,16 @@ Paths below are relative to the repository root.
   - consumer view/query surface (`views.py`, implemented Phase 5)
 
 ## Next steps
-1. Build linter/formatter/CLI integration over shared parse/lower + AST views:
+1. Implement parse-result carrier ergonomics over shared parse/lower artifacts:
+   - one reusable analysis carrier for downstream tooling
+   - explicit ownership/caching boundaries to prevent repeated parsing/lowering
+2. Deepen design before broad tool implementation:
+   - linter/type-checker/formatter boundaries and shared-facts model
+   - CWTools rules parser + normalized IR pipeline design
+3. Build linter/formatter/CLI integration over shared parse/lower + AST views:
    - keep one parse/lower lifecycle and reuse typed consumer views
    - avoid ad hoc raw CST structural re-derivation in tool entrypoints
-2. Maintain explicit parity tracking:
+4. Maintain explicit parity tracking:
    - update `docs/BIOME_PARITY.md` for each parser/CST/AST feature change
    - record any intentional deviations with rationale and tests
 

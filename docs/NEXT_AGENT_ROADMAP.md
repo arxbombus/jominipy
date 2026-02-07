@@ -176,3 +176,32 @@ Deliverables each phase:
 4. `uv run ruff check tests jominipy docs`
 5. `uv run pyrefly check`
 6. Re-run targeted tests for changed modules, then full parser/lexer/ast/cst-red suite.
+
+## Design Expansion Required Before Implementation
+The topics below are intentionally marked as **design-first** and must be expanded by subsequent agents before large implementation work:
+
+1. Parse result carrier API (next concrete step):
+   - define one reusable analysis carrier (Biome `Parse<T>`-style ergonomics) that bundles parse/lower artifacts and diagnostics
+   - define lifecycle ownership and caching policy (parse once, lower once, consume many)
+   - define stable public API surface for CLI/linter/formatter/type-checker consumers
+
+2. Linter architecture:
+   - define rule API, diagnostic model, and rule execution ordering
+   - define how linter consumes AST views and (future) type facts without re-parsing
+   - define game/domain rule packaging (e.g., HOI4 required field rules like `start_year`)
+
+3. Type checker architecture:
+   - define semantic/type fact model and how facts are produced from AST once
+   - define boundary between type errors (value/type constraints) and lint/domain violations (required fields/policy)
+   - define integration with linter to avoid duplicate traversal and duplicate diagnostics
+
+4. Formatter architecture:
+   - define formatter entrypoint over shared parse result while preserving CST/trivia as output source-of-truth
+   - define style/options model and deterministic/idempotent formatting guarantees
+   - define relationship between AST views (decision support) and CST token emission (final output)
+
+5. CWTools rules parser + converter architecture:
+   - define separate grammar pipeline for CWTools rule DSL (`references/hoi4-rules/Config`) rather than forcing game-data grammar reuse
+   - define normalized IR format for parsed rules (recommended generated artifact, not source-of-truth replacement)
+   - define semantic resolution pass for aliases/enums/scope/cardinality and integration with linter/type-check layers
+   - define versioning/update workflow so upstream maintained CWTools rules remain canonical input
