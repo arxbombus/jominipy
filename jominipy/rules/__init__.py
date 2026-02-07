@@ -2,10 +2,12 @@
 
 from jominipy.rules.ir import (
     IndexedRuleStatement,
+    RuleCardinality,
     RuleExpression,
     RuleFileIR,
     RuleMetadata,
     RuleOption,
+    RuleScopeReplacement,
     RuleSetIR,
     RuleStatement,
 )
@@ -20,10 +22,12 @@ from jominipy.rules.result import RulesParseResult
 __all__ = [
     "IndexedRuleStatement",
     "LoadRulesResult",
+    "RuleCardinality",
     "RuleExpression",
     "RuleFileIR",
     "RuleMetadata",
     "RuleOption",
+    "RuleScopeReplacement",
     "RuleSetIR",
     "RuleStatement",
     "RulesParseResult",
@@ -33,4 +37,3 @@ __all__ = [
     "parse_rules_text",
     "to_file_ir",
 ]
-

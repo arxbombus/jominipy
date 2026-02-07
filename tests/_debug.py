@@ -249,7 +249,7 @@ def _format_ast_value(value: object) -> str:
     return repr(value)
 
 
-def _dump_rules_ir(ruleset: RuleSetIR, with_path: bool = False, with_statement: bool = False) -> str:
+def _dump_rules_ir(ruleset: RuleSetIR) -> str:
     lines: list[str] = []
     lines.append(f"files={len(ruleset.files)} indexed={len(ruleset.indexed)}")
     lines.append("categories:")
@@ -261,9 +261,49 @@ def _dump_rules_ir(ruleset: RuleSetIR, with_path: bool = False, with_statement: 
         end = item.source_range.end.value
         family = item.family or "-"
         argument = item.argument or "-"
-        _path_str = f"{item.source_path}:" if with_path else ""
-        _stmt_str = f", stmt={item.statement!r}" if with_statement else ""
         lines.append(
-            f"  [{item.category}] {_path_str}{start}-{end} key={item.key!r}, family={family!r}, arg={argument!r}{_stmt_str}"
+            f"  [{item.category}] {item.source_path}:{start}-{end} key={item.key!r} family={family!r} arg={argument!r}"
         )
+        lines.append(f"    path={' > '.join(item.declaration_path)}")
+        metadata_lines = _format_rule_metadata_lines(item.statement.metadata)
+        lines.extend(f"    {entry}" for entry in metadata_lines)
     return "\n".join(lines)
+
+
+def _format_rule_metadata_lines(metadata: object) -> list[str]:
+    # Keep this intentionally duck-typed so the debug module stays import-light.
+    documentation = getattr(metadata, "documentation", ())
+    options = getattr(metadata, "options", ())
+    cardinality = getattr(metadata, "cardinality", None)
+    scope = getattr(metadata, "scope", None)
+    push_scope = getattr(metadata, "push_scope", None)
+    replace_scope = getattr(metadata, "replace_scope", None)
+    severity = getattr(metadata, "severity", None)
+    flags = getattr(metadata, "flags", frozenset())
+
+    lines: list[str] = []
+    if documentation:
+        lines.append(f"docs={tuple(documentation)!r}")
+    if options:
+        rendered_options = tuple(f"{option.key}={option.value!r}" for option in options)
+        lines.append(f"options={rendered_options!r}")
+    if cardinality is not None:
+        lines.append(
+            "cardinality="
+            f"(min={cardinality.minimum!r}, max={cardinality.maximum!r}, soft={cardinality.soft_minimum}, "
+            f"min_unbounded={cardinality.minimum_unbounded}, max_unbounded={cardinality.maximum_unbounded})"
+        )
+    if scope is not None:
+        lines.append(f"scope={scope!r}")
+    if push_scope is not None:
+        lines.append(f"push_scope={push_scope!r}")
+    if replace_scope is not None:
+        rendered_replace = tuple(f"{entry.source}->{entry.target}" for entry in replace_scope)
+        lines.append(f"replace_scope={rendered_replace!r}")
+    if severity is not None:
+        lines.append(f"severity={severity!r}")
+    if flags:
+        lines.append(f"flags={tuple(sorted(flags))!r}")
+    if not lines:
+        lines.append("metadata=(none)")
+    return lines

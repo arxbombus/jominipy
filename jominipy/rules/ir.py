@@ -24,11 +24,36 @@ class RuleOption:
 
 
 @dataclass(frozen=True, slots=True)
+class RuleCardinality:
+    """Typed cardinality parsed from `## cardinality = ...`."""
+
+    minimum: int | None
+    maximum: int | None
+    soft_minimum: bool
+    minimum_unbounded: bool = False
+    maximum_unbounded: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class RuleScopeReplacement:
+    """Typed item parsed from `## replace_scope = { this = planet ... }`."""
+
+    source: str
+    target: str
+
+
+@dataclass(frozen=True, slots=True)
 class RuleMetadata:
     """Documentation and options attached to one declaration."""
 
     documentation: tuple[str, ...] = ()
     options: tuple[RuleOption, ...] = ()
+    cardinality: RuleCardinality | None = None
+    scope: tuple[str, ...] | None = None
+    push_scope: tuple[str, ...] | None = None
+    replace_scope: tuple[RuleScopeReplacement, ...] | None = None
+    severity: str | None = None
+    flags: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +103,7 @@ class IndexedRuleStatement:
     key: str
     family: str | None
     argument: str | None
+    declaration_path: tuple[str, ...]
     statement: RuleStatement
 
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from jominipy.rules import load_rules_paths, parse_rules_text, to_file_ir
+from jominipy.rules.normalize import normalize_ruleset
 from tests._debug import debug_dump_rules_ir
 
 
@@ -58,3 +59,63 @@ def test_rules_loader_ingests_hoi4_samples_and_indexes_categories() -> None:
 
     types = loaded.ruleset.by_category["type"]
     assert any(item.key == "type[technology]" for item in types)
+
+
+def test_rules_normalization_parses_typed_metadata_options() -> None:
+    source = """### Rule docs
+## cardinality = ~1..inf
+## scope = { country state }
+## push_scope = country
+## replace_scope = { this = planet root = country }
+## severity = warning
+## required
+allow = {
+    value = int
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-options.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    debug_dump_rules_ir("test_rules_normalization_parses_typed_metadata_options", ruleset)
+
+    allow_entries = [item for item in ruleset.indexed if item.key == "allow"]
+    assert len(allow_entries) == 1
+    metadata = allow_entries[0].statement.metadata
+    assert metadata.documentation == ("Rule docs",)
+    assert metadata.cardinality is not None
+    assert metadata.cardinality.soft_minimum is True
+    assert metadata.cardinality.minimum == 1
+    assert metadata.cardinality.maximum is None
+    assert metadata.cardinality.maximum_unbounded is True
+    assert metadata.scope == ("country", "state")
+    assert metadata.push_scope == ("country",)
+    assert metadata.replace_scope is not None
+    assert tuple((entry.source, entry.target) for entry in metadata.replace_scope) == (
+        ("this", "planet"),
+        ("root", "country"),
+    )
+    assert metadata.severity == "warning"
+    assert "required" in metadata.flags
+
+
+def test_rules_indexing_disambiguates_repeated_keys_with_declaration_paths() -> None:
+    source = """technology = {
+    x = int
+    x = float
+    child = {
+        x = bool
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-paths.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    debug_dump_rules_ir("test_rules_indexing_disambiguates_repeated_keys_with_declaration_paths", ruleset)
+
+    x_entries = [item for item in ruleset.indexed if item.key == "x"]
+    assert len(x_entries) == 3
+    paths = {entry.declaration_path for entry in x_entries}
+    assert len(paths) == 3
+    assert ("technology#0", "x#0") in paths
+    assert ("technology#0", "x#1") in paths
+    assert ("technology#0", "child#0", "x#0") in paths
