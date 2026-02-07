@@ -18,6 +18,7 @@ from jominipy.ast.model import (
 from jominipy.ast.scalar import (
     DateLike,
     ScalarInterpretation,
+    ScalarKind,
     interpret_scalar,
     parse_bool,
     parse_date_like,
@@ -39,6 +40,7 @@ __all__ = [
     "AstValue",
     "DateLike",
     "ScalarInterpretation",
+    "ScalarKind",
     "interpret_scalar",
     "lower_tree",
     "parse_bool",

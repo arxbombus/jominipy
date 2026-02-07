@@ -42,7 +42,7 @@ Status:
 - Added AST tests for shape/coercion/repeated-key behavior in `tests/test_ast.py`.
 - Canonical AST remains order-preserving and unchanged; coercion remains derived-view only.
 
-## Phase 2: Scalar interpretation policy hardening
+## Phase 2: Scalar interpretation policy hardening (completed)
 Goal: keep semantics explicit and non-destructive.
 
 Deliverables:
@@ -56,6 +56,17 @@ Deliverables:
 
 Tests:
 - Add table-driven scalar interpretation tests, including quoted/unquoted contrast and very large integers.
+
+Status:
+- Implemented in `jominipy/ast/scalar.py`:
+  - explicit scalar kind model: `ScalarKind` (`unknown`, `bool`, `number`, `date_like`)
+  - formal interpretation result model with explicit `kind`, `value`, and compatibility fields
+  - deterministic interpretation precedence and explicit unknown handling
+  - quoted scalar policy: no coercion by default, optional opt-in via `allow_quoted=True`
+- Added table-driven scalar interpretation tests in `tests/test_ast.py`:
+  - bool/number/date/unknown coverage
+  - quoted default vs opt-in coercion coverage
+  - large integer and sign handling coverage
 
 ## Phase 3: Red CST wrappers (Biome parity priority)
 Goal: stop doing manual green-tree walking in high-level code.
@@ -91,6 +102,6 @@ Deliverables each phase:
 
 ## Suggested command sequence for next agent
 1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py`
-2. Implement one phase only (start with Phase 2).
+2. Implement one phase only (start with Phase 3).
 3. `uv run ruff check tests jominipy`
 4. Re-run targeted tests for changed modules, then full test trio again.

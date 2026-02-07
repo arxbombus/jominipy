@@ -1,5 +1,21 @@
 # Handoff
 
+## 2026-02-07 Update: Phase 2 (scalar interpretation hardening) landed
+- Implemented in `jominipy/ast/scalar.py`:
+  - explicit scalar interpretation kinds via `ScalarKind` (`unknown`, `bool`, `number`, `date_like`)
+  - formal interpretation payload via `ScalarInterpretation.kind` and `ScalarInterpretation.value`
+  - deterministic precedence and explicit unknown handling
+  - quoted scalar policy: non-coercing by default; opt-in coercion via `allow_quoted=True`
+- Added scalar policy tests in `tests/test_ast.py`:
+  - table-driven unquoted interpretation coverage (bool/date/number/unknown)
+  - quoted default-vs-opt-in behavior
+  - large integer and sign handling checks
+- Validation:
+  - `uv run pytest -q tests/test_ast.py tests/test_parser.py tests/test_lexer.py`
+  - `uv run ruff check tests jominipy`
+  - `218 passed` and Ruff clean
+- Parser/CST contracts unchanged; Phase 2 is AST-semantic only.
+
 ## 2026-02-07 Update: Phase 1 (AST block/list coercion) landed
 - Implemented in `jominipy/ast/model.py`:
   - block-shape helpers: `is_object_like`, `is_array_like`, `is_mixed`, `is_empty_ambiguous`
@@ -102,10 +118,10 @@ Concrete example:
   - `uv run ruff check --fix`
 
 ## Next Task
-Follow `docs/NEXT_AGENT_ROADMAP.md` starting with **Phase 2** (scalar interpretation policy hardening) without changing parser/CST contracts.
+Follow `docs/NEXT_AGENT_ROADMAP.md` starting with **Phase 3** (red CST wrappers) without changing parser/CST contracts.
 
 Suggested next command sequence:
 1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py`
-2. Implement Phase 2 only.
+2. Implement Phase 3 only.
 3. `uv run ruff check tests jominipy`
 4. Re-run targeted tests, then the full test trio.

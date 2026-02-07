@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 import re
 
 type DateLike = tuple[int, int, int]
@@ -12,11 +13,24 @@ _FLOAT_RE = re.compile(r"^[+-]?(?:\d+\.\d+|\d+\.\d*|\.\d+)$")
 _DATE_RE = re.compile(r"^([+-]?\d+)\.(\d+)\.(\d+)$")
 
 
+class ScalarKind(StrEnum):
+    UNKNOWN = "unknown"
+    BOOL = "bool"
+    NUMBER = "number"
+    DATE_LIKE = "date_like"
+
+
 @dataclass(frozen=True, slots=True)
 class ScalarInterpretation:
+    kind: ScalarKind
+    value: bool | int | float | DateLike | None
     bool_value: bool | None
     number_value: int | float | None
     date_value: DateLike | None
+
+    @property
+    def is_unknown(self) -> bool:
+        return self.kind == ScalarKind.UNKNOWN
 
 
 def parse_bool(text: str) -> bool | None:
@@ -65,21 +79,56 @@ def interpret_scalar(
 ) -> ScalarInterpretation:
     if was_quoted and not allow_quoted:
         return ScalarInterpretation(
+            kind=ScalarKind.UNKNOWN,
+            value=None,
             bool_value=None,
             number_value=None,
             date_value=None,
         )
 
+    bool_value = parse_bool(text)
+    if bool_value is not None:
+        return ScalarInterpretation(
+            kind=ScalarKind.BOOL,
+            value=bool_value,
+            bool_value=bool_value,
+            number_value=None,
+            date_value=None,
+        )
+
+    date_value = parse_date_like(text)
+    if date_value is not None:
+        return ScalarInterpretation(
+            kind=ScalarKind.DATE_LIKE,
+            value=date_value,
+            bool_value=None,
+            number_value=None,
+            date_value=date_value,
+        )
+
+    number_value = parse_number(text)
+    if number_value is not None:
+        return ScalarInterpretation(
+            kind=ScalarKind.NUMBER,
+            value=number_value,
+            bool_value=None,
+            number_value=number_value,
+            date_value=None,
+        )
+
     return ScalarInterpretation(
-        bool_value=parse_bool(text),
-        number_value=parse_number(text),
-        date_value=parse_date_like(text),
+        kind=ScalarKind.UNKNOWN,
+        value=None,
+        bool_value=None,
+        number_value=None,
+        date_value=None,
     )
 
 
 __all__ = [
     "DateLike",
     "ScalarInterpretation",
+    "ScalarKind",
     "interpret_scalar",
     "parse_bool",
     "parse_date_like",
