@@ -66,6 +66,14 @@ Every agent must perform this checklist before finishing a substantive task:
   - linter is reserved for static analysis policy, semantics, style, and heuristics
   - linter may consume type facts, but checker must remain independent from lint rules
   - next implementation step is to enforce this boundary mechanically (rule metadata/contracts + tests), not just by convention
+- Boundary enforcement landed:
+  - `jominipy/typecheck/rules.py`: type-check rule contract now enforces `domain=correctness`, `confidence=sound`, `TYPECHECK_` code prefix
+  - `jominipy/lint/rules.py`: lint rule contract now enforces `domain in {semantic, style, heuristic}`, `confidence in {policy, heuristic}`, `LINT_` code prefix
+  - runners validate contracts before execution:
+    - `jominipy/typecheck/runner.py`
+    - `jominipy/lint/runner.py`
+  - boundary tests added:
+    - `tests/test_lint_typecheck_engines.py` (invalid-domain/confidence rejection)
 - Implementation status adjustment:
   - implementation work is now paused
   - current focus is completing the full Phase 0 proposal and gating criteria across docs/memories
@@ -96,7 +104,7 @@ Every agent must perform this checklist before finishing a substantive task:
 ## Next Task (post-Phase-0 kickoff)
 - Phase 0 planning gate is complete.
 - Immediate next step: start Phase 1 execution (lint engine core) under the approved proposal constraints.
-- Immediate next step: continue Phase 1 by enforcing lint/checker rule-domain contracts, then replacing scaffold rules with CWTools-derived rule IR consumers.
+- Immediate next step: replace scaffold rules with CWTools-derived rule IR consumers under the enforced lint/checker contracts.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule (`start_year` required for HOI4 technology objects)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Protocol
+from typing import Literal, Protocol
 
 from jominipy.analysis import AnalysisFacts
 from jominipy.ast import AstBlock
@@ -16,6 +16,9 @@ from jominipy.diagnostics import (
 )
 from jominipy.text import TextRange, TextSize
 from jominipy.typecheck.rules import TypecheckFacts
+
+type LintDomain = Literal["semantic", "style", "heuristic"]
+type LintConfidence = Literal["policy", "heuristic"]
 
 
 class LintRule(Protocol):
@@ -30,6 +33,12 @@ class LintRule(Protocol):
     @property
     def category(self) -> str: ...
 
+    @property
+    def domain(self) -> LintDomain: ...
+
+    @property
+    def confidence(self) -> LintConfidence: ...
+
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]: ...
 
 
@@ -40,6 +49,8 @@ class SemanticInconsistentShapeRule:
     code: str = LINT_SEMANTIC_INCONSISTENT_SHAPE.code
     name: str = "semanticInconsistentShape"
     category: str = "semantic"
+    domain: LintDomain = "semantic"
+    confidence: LintConfidence = "heuristic"
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
@@ -64,6 +75,8 @@ class SemanticMissingStartYearRule:
     code: str = LINT_SEMANTIC_MISSING_START_YEAR.code
     name: str = "semanticMissingStartYear"
     category: str = "semantic"
+    domain: LintDomain = "semantic"
+    confidence: LintConfidence = "policy"
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
@@ -97,6 +110,8 @@ class StyleSingleLineMultiValueBlockRule:
     code: str = LINT_STYLE_SINGLE_LINE_BLOCK.code
     name: str = "styleSingleLineMultiValueBlock"
     category: str = "style"
+    domain: LintDomain = "style"
+    confidence: LintConfidence = "policy"
 
     _pattern: re.Pattern[str] = re.compile(r"\{[^\n{}]*\s+[^\n{}]*\}")
 
@@ -123,6 +138,24 @@ def default_lint_rules() -> tuple[LintRule, ...]:
         StyleSingleLineMultiValueBlockRule(),
     ]
     return tuple(sorted(rules, key=lambda rule: (rule.category, rule.code, rule.name)))
+
+
+def validate_lint_rules(rules: tuple[LintRule, ...]) -> None:
+    allowed_domains = {"semantic", "style", "heuristic"}
+    allowed_confidence = {"policy", "heuristic"}
+    for rule in rules:
+        if rule.domain not in allowed_domains:
+            raise ValueError(
+                f"Lint rule `{rule.name}` has invalid domain `{rule.domain}`; expected semantic/style/heuristic."
+            )
+        if rule.confidence not in allowed_confidence:
+            raise ValueError(
+                f"Lint rule `{rule.name}` has invalid confidence `{rule.confidence}`; expected policy/heuristic."
+            )
+        if not rule.code.startswith("LINT_"):
+            raise ValueError(
+                f"Lint rule `{rule.name}` has invalid code `{rule.code}`; expected `LINT_` prefix."
+            )
 
 
 def _find_key_range(text: str, key: str) -> TextRange:

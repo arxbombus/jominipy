@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from jominipy.diagnostics import Diagnostic, has_errors
 from jominipy.format import run_format as _run_format
 from jominipy.lint import run_lint as _run_lint
@@ -13,6 +15,10 @@ from jominipy.pipeline.results import (
     LintRunResult,
     TypecheckRunResult,
 )
+
+if TYPE_CHECKING:
+    from jominipy.lint.rules import LintRule
+    from jominipy.typecheck.rules import TypecheckRule
 from jominipy.typecheck import run_typecheck as _run_typecheck
 
 
@@ -23,6 +29,7 @@ def run_lint(
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
     typecheck: TypecheckRunResult | None = None,
+    rules: tuple[LintRule, ...] | None = None,
 ) -> LintRunResult:
     """Run linting over one Jomini parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
@@ -37,6 +44,7 @@ def run_lint(
         resolved_parse.source_text,
         parse=resolved_parse,
         typecheck=typecheck_result,
+        rules=rules,
     )
 
 
@@ -46,10 +54,15 @@ def run_typecheck(
     *,
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
+    rules: tuple[TypecheckRule, ...] | None = None,
 ) -> TypecheckRunResult:
     """Run type checking over one Jomini parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
-    return _run_typecheck(resolved_parse.source_text, parse=resolved_parse)
+    return _run_typecheck(
+        resolved_parse.source_text,
+        parse=resolved_parse,
+        rules=rules,
+    )
 
 
 def run_format(

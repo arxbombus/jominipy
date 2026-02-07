@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from jominipy.analysis import AnalysisFacts
 from jominipy.diagnostics import TYPECHECK_INCONSISTENT_VALUE_SHAPE, Diagnostic
 from jominipy.text import TextRange, TextSize
+
+type TypecheckDomain = Literal["correctness"]
+type TypecheckConfidence = Literal["sound"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +29,12 @@ class TypecheckRule(Protocol):
     @property
     def name(self) -> str: ...
 
+    @property
+    def domain(self) -> TypecheckDomain: ...
+
+    @property
+    def confidence(self) -> TypecheckConfidence: ...
+
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]: ...
 
 
@@ -35,6 +44,8 @@ class InconsistentTopLevelShapeRule:
 
     code: str = TYPECHECK_INCONSISTENT_VALUE_SHAPE.code
     name: str = "inconsistentTopLevelShape"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
@@ -63,6 +74,22 @@ def build_typecheck_facts(facts: AnalysisFacts) -> TypecheckFacts:
 def default_typecheck_rules() -> tuple[TypecheckRule, ...]:
     rules: list[TypecheckRule] = [InconsistentTopLevelShapeRule()]
     return tuple(sorted(rules, key=lambda rule: (rule.code, rule.name)))
+
+
+def validate_typecheck_rules(rules: tuple[TypecheckRule, ...]) -> None:
+    for rule in rules:
+        if rule.domain != "correctness":
+            raise ValueError(
+                f"Typecheck rule `{rule.name}` has invalid domain `{rule.domain}`; expected `correctness`."
+            )
+        if rule.confidence != "sound":
+            raise ValueError(
+                f"Typecheck rule `{rule.name}` has invalid confidence `{rule.confidence}`; expected `sound`."
+            )
+        if not rule.code.startswith("TYPECHECK_"):
+            raise ValueError(
+                f"Typecheck rule `{rule.name}` has invalid code `{rule.code}`; expected `TYPECHECK_` prefix."
+            )
 
 
 def _find_key_range(text: str, key: str) -> TextRange:

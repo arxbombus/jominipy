@@ -45,7 +45,7 @@ For every parser/CST/AST feature, record:
 | Thin orchestration entrypoints | `biome_service/src/file_handlers/javascript.rs` | `jominipy/pipeline/entrypoints.py` | adapted | `run_typecheck` added; `run_check` now composes parse + typecheck + lint with one shared parse lifecycle |
 | Lint runner boundary | `biome_js_analyze/src/lib.rs`, `registry.rs` | `jominipy/lint/runner.py` | adapted | Deterministic registry scaffolds landed with semantic/style split and type-fact consumption |
 | Formatter runner boundary | `biome_js_formatter/src/lib.rs` | `jominipy/format/runner.py` | pending | CST/trivia remains source-of-truth; AST views only guide decisions |
-| Type-checker boundary | `biome_js_semantic/src/*`, `biome_js_type_info/src/*` | `jominipy/typecheck/*` | adapted | Engine scaffold landed; next step is enforcing rule-domain contracts (checker=sound correctness, lint=semantic/style/heuristic) |
+| Type-checker boundary | `biome_js_semantic/src/*`, `biome_js_type_info/src/*` | `jominipy/typecheck/*` | adapted | Engine scaffold + rule-domain enforcement landed (`correctness` + `sound` contracts) |
 | Rules DSL parsing + generation | `xtask/codegen`, `biome_syntax_codegen/src/*` | planned `jominipy/rules/*` + generation pipeline | pending | Separate DSL parser and normalized IR for generated models/validators |
 
 ## Phase 0 parity gate checklist

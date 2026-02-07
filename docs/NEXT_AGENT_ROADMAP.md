@@ -101,11 +101,18 @@ Status:
   - entrypoint orchestration update: `run_typecheck(...)` and `run_check(...)` compose typecheck + lint over one parse
   - validation coverage: `tests/test_lint_typecheck_engines.py`
 - Next:
-  - add rule-domain contract enforcement:
-    - checker rules must be correctness/soundness only
-    - lint rules may be semantic/style/heuristic and may consume checker facts
-    - checker must not depend on lint execution
-  - replace scaffold semantic/style/type rules with CWTools-derived rule IR consumers.
+  - replace scaffold semantic/style/type rules with CWTools-derived rule IR consumers under enforced rule-domain contracts.
+
+## Phase 1 Boundary Contracts (completed)
+- checker rule contracts are enforced mechanically:
+  - domain must be `correctness`
+  - confidence must be `sound`
+  - code prefix must be `TYPECHECK_`
+- lint rule contracts are enforced mechanically:
+  - domain must be `semantic`, `style`, or `heuristic`
+  - confidence must be `policy` or `heuristic`
+  - code prefix must be `LINT_`
+- runners validate contracts before rule execution.
 
 ## Phase 1: AST block/list coercion and repeated-key policy (completed)
 Goal: make AST ergonomic for Jomini data access while preserving CST truth.

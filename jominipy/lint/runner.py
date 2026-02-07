@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from jominipy.diagnostics import Diagnostic
-from jominipy.lint.rules import LintRule, default_lint_rules
+from jominipy.lint.rules import (
+    LintRule,
+    default_lint_rules,
+    validate_lint_rules,
+)
 from jominipy.parser import ParseMode, ParserOptions, parse_result
 from jominipy.pipeline.result import JominiParseResult
 from jominipy.pipeline.results import LintRunResult, TypecheckRunResult
@@ -26,6 +30,7 @@ def run_lint(
     resolved_typecheck = _resolve_typecheck(typecheck=typecheck, parse=resolved_parse)
     analysis_facts = resolved_parse.analysis_facts()
     resolved_rules = tuple(rules) if rules is not None else default_lint_rules()
+    validate_lint_rules(resolved_rules)
 
     diagnostics = list(resolved_parse.diagnostics)
     for rule in resolved_rules:

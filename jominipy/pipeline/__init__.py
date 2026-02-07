@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from jominipy.parser.options import ParseMode, ParserOptions
 from jominipy.pipeline.result import JominiParseResult, ParseResultBase
 from jominipy.pipeline.results import (
@@ -11,6 +13,10 @@ from jominipy.pipeline.results import (
     TypecheckRunResult,
 )
 
+if TYPE_CHECKING:
+    from jominipy.lint.rules import LintRule
+    from jominipy.typecheck.rules import TypecheckRule
+
 
 def run_lint(
     text: str,
@@ -19,6 +25,7 @@ def run_lint(
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
     typecheck: TypecheckRunResult | None = None,
+    rules: tuple[LintRule, ...] | None = None,
 ) -> LintRunResult:
     from jominipy.pipeline.entrypoints import run_lint as _run_lint
 
@@ -28,6 +35,7 @@ def run_lint(
         mode=mode,
         parse=parse,
         typecheck=typecheck,
+        rules=rules,
     )
 
 
@@ -61,10 +69,11 @@ def run_typecheck(
     *,
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
+    rules: tuple[TypecheckRule, ...] | None = None,
 ) -> TypecheckRunResult:
     from jominipy.pipeline.entrypoints import run_typecheck as _run_typecheck
 
-    return _run_typecheck(text, options=options, mode=mode, parse=parse)
+    return _run_typecheck(text, options=options, mode=mode, parse=parse, rules=rules)
 
 
 __all__ = [

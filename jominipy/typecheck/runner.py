@@ -12,6 +12,7 @@ from jominipy.typecheck.rules import (
     TypecheckRule,
     build_typecheck_facts,
     default_typecheck_rules,
+    validate_typecheck_rules,
 )
 
 
@@ -29,6 +30,7 @@ def run_typecheck(
     type_facts = build_typecheck_facts(analysis_facts)
 
     resolved_rules = tuple(rules) if rules is not None else default_typecheck_rules()
+    validate_typecheck_rules(resolved_rules)
 
     diagnostics = list(resolved_parse.diagnostics)
     for rule in resolved_rules:
