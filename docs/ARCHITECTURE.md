@@ -1,6 +1,15 @@
 # jominipy Architecture: Biome-style Lexer → Parser → CST → AST (Python-first)
 
-This document defines the architecture we are implementing in jominipy. It is explicitly modeled after Biome’s layering (lexer → buffered lexer → token source → event parser → lossless tree sink → green tree → red wrappers → AST), but written in Python-friendly terms.
+This document defines the architecture we are implementing in jominipy.
+
+## Toolchain scope (Biome-style)
+jominipy is a Biome-style toolchain for Paradox game scripts (Jomini/Clausewitz). The library provides:
+- Parser
+- Linter
+- Formatter
+- CLI
+
+The architecture below focuses on the parsing stack that enables lossless formatting and consistent linting.
 
 The design goal is not “parsing that works”, but a system that is:
 - Lossless: we can reproduce the original formatting (tokens + trivia) from the CST.

@@ -27,6 +27,7 @@ class LexContext:
 class LookaheadToken:
     kind: TokenKind
     flags: TokenFlags
+    range: TextRange
 
     def has_preceding_line_break(self) -> bool:
         return bool(self.flags & TokenFlags.PRECEDING_LINE_BREAK)
@@ -112,7 +113,6 @@ class BufferedLexer:
     def lookahead(self, lookahead: Lookahead) -> None:
         self._lookahead = lookahead
 
-    @property
     def next_token(self, context: LexContext | None = None) -> TokenKind:
         if context is None:
             context = LexContext()
@@ -161,7 +161,6 @@ class BufferedLexer:
     def source(self) -> str:
         return self.inner.source
 
-    @property
     def lookahead_iter(self) -> "LookaheadIterator":
         return LookaheadIterator(self)
 
@@ -181,12 +180,19 @@ class BufferedLexer:
             raise ValueError("n must be >= 1")
         checkpoint = self.lookahead.get_non_trivia_checkpoint(n - 1)
         if checkpoint is not None:
-            return LookaheadToken(checkpoint.current_kind, checkpoint.current_flags)
+            return LookaheadToken(
+                checkpoint.current_kind,
+                checkpoint.current_flags,
+                TextRange.new(
+                    checkpoint.current_start,
+                    TextSize.from_int(checkpoint.position),
+                ),
+            )
 
         remaining = n - self.lookahead.non_trivia_len()
         current_length = self.lookahead.all_len()
 
-        for item in self.lookahead_iter.skip(current_length):
+        for item in self.lookahead_iter().skip(current_length):
             if not item.kind.is_trivia:
                 remaining -= 1
                 if remaining == 0:
@@ -210,7 +216,14 @@ class LookaheadIterator:
         self._nth += 1
 
         if (checkpoint := self._buffered.lookahead.get_checkpoint(self._nth - 1)) is not None:
-            return LookaheadToken(checkpoint.current_kind, checkpoint.current_flags)
+            return LookaheadToken(
+                checkpoint.current_kind,
+                checkpoint.current_flags,
+                TextRange.new(
+                    checkpoint.current_start,
+                    TextSize.from_int(checkpoint.position),
+                ),
+            )
 
         lexer = self._buffered.inner
 
@@ -222,7 +235,11 @@ class LookaheadIterator:
 
         token = lexer.next_token
         self._buffered.lookahead.push_back(lexer.checkpoint)
-        return LookaheadToken(token.kind, lexer.current_flags)
+        return LookaheadToken(
+            token.kind,
+            lexer.current_flags,
+            lexer.current_range,
+        )
 
     def skip(self, count: int) -> "LookaheadIterator":
         for _ in range(count):

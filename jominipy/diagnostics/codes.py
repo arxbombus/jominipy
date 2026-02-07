@@ -22,3 +22,38 @@ LEXER_UNTERMINATED_STRING: Final[DiagnosticSpec] = DiagnosticSpec(
     severity="error",
     category="lexer",
 )
+
+PARSER_EXPECTED_VALUE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="PARSER_EXPECTED_VALUE",
+    message="Expected a value",
+    severity="error",
+    category="parser",
+)
+
+PARSER_LEGACY_EXTRA_RBRACE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="PARSER_LEGACY_EXTRA_RBRACE",
+    message="Ignoring extra closing brace in permissive mode",
+    severity="warning",
+    category="parser",
+)
+
+PARSER_LEGACY_MISSING_RBRACE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="PARSER_LEGACY_MISSING_RBRACE",
+    message="Missing closing brace tolerated in permissive mode",
+    severity="warning",
+    category="parser",
+)
+
+PARSER_UNSUPPORTED_UNMARKED_LIST: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="PARSER_UNSUPPORTED_UNMARKED_LIST",
+    message='Unsupported unmarked list form: expected tagged list block, got `list "..."`',
+    severity="error",
+    category="parser",
+)
+
+PARSER_UNSUPPORTED_PARAMETER_SYNTAX: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="PARSER_UNSUPPORTED_PARAMETER_SYNTAX",
+    message="Unsupported parameter syntax scalar (`[[...]]` or `$...$`)",
+    severity="error",
+    category="parser",
+)
