@@ -4,9 +4,11 @@ from dataclasses import dataclass
 
 from jominipy.diagnostics import Diagnostic
 from jominipy.diagnostics.codes import (
+    PARSER_EXPECTED_TOKEN,
     PARSER_EXPECTED_VALUE,
     PARSER_LEGACY_EXTRA_RBRACE,
     PARSER_LEGACY_MISSING_RBRACE,
+    PARSER_UNEXPECTED_TOKEN,
     PARSER_UNSUPPORTED_PARAMETER_SYNTAX,
     PARSER_UNSUPPORTED_UNMARKED_LIST,
 )
@@ -222,9 +224,11 @@ def _can_start_scalar(kind: TokenKind) -> bool:
 
 def _expected_token(parser: Parser, kind: TokenKind) -> Diagnostic:
     return Diagnostic(
-        code="PARSER_EXPECTED_TOKEN",
+        code=PARSER_EXPECTED_TOKEN.code,
         message=f"Expected token {kind.name}",
         range=parser.current_range,
+        severity=PARSER_EXPECTED_TOKEN.severity,
+        category=PARSER_EXPECTED_TOKEN.category,
     )
 
 
@@ -240,9 +244,11 @@ def _expected_value(parser: Parser) -> Diagnostic:
 
 def _unexpected_token(parser: Parser) -> Diagnostic:
     return Diagnostic(
-        code="PARSER_UNEXPECTED_TOKEN",
+        code=PARSER_UNEXPECTED_TOKEN.code,
         message=f"Unexpected token {parser.current.name}",
         range=parser.current_range,
+        severity=PARSER_UNEXPECTED_TOKEN.severity,
+        category=PARSER_UNEXPECTED_TOKEN.category,
     )
 
 

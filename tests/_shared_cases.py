@@ -263,6 +263,16 @@ PARSER_CASES: tuple[JominiCase, ...] = (
         ),
         strict_should_parse_cleanly=False,
     ),
+    JominiCase(
+        name="edge_case_recovery_between_valid_statements",
+        source="a=1 ?=oops\nb=2\n",
+        strict_should_parse_cleanly=False,
+    ),
+    JominiCase(
+        name="edge_case_missing_value_then_invalid_operator",
+        source="a=\n?=oops\nb=2\n",
+        strict_should_parse_cleanly=False,
+    ),
 )
 
 LEXER_CUSTOM_CASES: tuple[JominiCase, ...] = (
@@ -476,6 +486,8 @@ type CaseName = Literal[
     "edge_case_unmarked_list_form_fails_for_now",
     "edge_case_alternating_value_and_key_value_is_accepted",
     "edge_case_stray_definition_line_fails_in_strict_mode",
+    "edge_case_recovery_between_valid_statements",
+    "edge_case_missing_value_then_invalid_operator",
     "campaign_stats_minimal_block",
     "meta_data_core_fields_lex_correctly",
     "eu4_header_and_campaign_stats",

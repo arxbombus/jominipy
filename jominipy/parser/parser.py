@@ -166,6 +166,10 @@ class Parser:
         return ParsedSyntax.absent()
 
     def error(self, diagnostic: Diagnostic) -> None:
+        if self._diagnostics:
+            previous = self._diagnostics[-1]
+            if previous.range.start == diagnostic.range.start:
+                return
         self._diagnostics.append(diagnostic)
 
     def is_speculative_parsing(self) -> bool:

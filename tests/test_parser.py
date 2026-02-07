@@ -38,6 +38,28 @@ def _collect_node_kinds(root: GreenNode) -> list[JominiSyntaxKind]:
     return kinds
 
 
+def _statement_list_node(root: GreenNode) -> GreenNode:
+    source = next(
+        child
+        for child in root.children
+        if isinstance(child, GreenNode) and child.kind == JominiSyntaxKind.SOURCE_FILE
+    )
+    return next(
+        child
+        for child in source.children
+        if isinstance(child, GreenNode) and child.kind == JominiSyntaxKind.STATEMENT_LIST
+    )
+
+
+def _statement_list_child_kinds(root: GreenNode) -> list[JominiSyntaxKind]:
+    statement_list = _statement_list_node(root)
+    return [
+        child.kind
+        for child in statement_list.children
+        if isinstance(child, GreenNode)
+    ]
+
+
 def _collect_tokens(root: GreenNode) -> list[GreenToken]:
     tokens: list[GreenToken] = []
 
@@ -311,7 +333,9 @@ def test_edge_case_extraneous_closing_brace_is_tolerated_in_permissive_mode() ->
     src = case_source("edge_case_extraneous_closing_brace_fails_in_strict_mode")
     parsed = parse_jomini(src, mode=ParseMode.PERMISSIVE)
     assert parsed.root is not None
-    assert any(d.code == "PARSER_LEGACY_EXTRA_RBRACE" for d in parsed.diagnostics)
+    assert [d.code for d in parsed.diagnostics] == ["PARSER_LEGACY_EXTRA_RBRACE"]
+    assert all(d.severity == "warning" for d in parsed.diagnostics)
+    assert all(d.category == "parser" for d in parsed.diagnostics)
 
 
 def test_edge_case_missing_closing_brace_fails_in_strict_mode() -> None:
@@ -323,7 +347,9 @@ def test_edge_case_missing_closing_brace_is_tolerated_in_permissive_mode() -> No
     src = case_source("edge_case_missing_closing_brace_fails_in_strict_mode")
     parsed = parse_jomini(src, mode=ParseMode.PERMISSIVE)
     assert parsed.root is not None
-    assert any(d.code == "PARSER_LEGACY_MISSING_RBRACE" for d in parsed.diagnostics)
+    assert [d.code for d in parsed.diagnostics] == ["PARSER_LEGACY_MISSING_RBRACE"]
+    assert all(d.severity == "warning" for d in parsed.diagnostics)
+    assert all(d.category == "parser" for d in parsed.diagnostics)
 
 
 def test_edge_case_parameter_syntax_fails_for_now() -> None:
@@ -379,6 +405,19 @@ def test_recovery_creates_error_node_and_continues_parsing() -> None:
     assert parsed.diagnostics != []
     assert JominiSyntaxKind.ERROR in kinds
     assert kinds.count(JominiSyntaxKind.KEY_VALUE) == 2
+    assert _statement_list_child_kinds(parsed.root) == [
+        JominiSyntaxKind.KEY_VALUE,
+        JominiSyntaxKind.ERROR,
+        JominiSyntaxKind.KEY_VALUE,
+    ]
+
+
+def test_recovery_diagnostics_are_deduplicated_at_same_position() -> None:
+    parsed = parse_jomini("a=\n?=oops\nb=2\n")
+
+    assert [d.code for d in parsed.diagnostics] == ["PARSER_EXPECTED_VALUE"]
+    assert all(d.severity == "error" for d in parsed.diagnostics)
+    assert all(d.category == "parser" for d in parsed.diagnostics)
 
 
 def test_parser_checkpoint_rewind_restores_stream_and_events() -> None:

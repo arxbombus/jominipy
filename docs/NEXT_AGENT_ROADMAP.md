@@ -93,7 +93,7 @@ Status:
   - `parse_to_ast(...)` and `lower_tree(...)` now lower through red wrappers
 - Added red-wrapper tests in `tests/test_cst_red.py`.
 
-## Phase 4: Recovery/diagnostic hardening
+## Phase 4: Recovery/diagnostic hardening (completed)
 Goal: robust parse under malformed real-world input.
 
 Deliverables:
@@ -102,6 +102,17 @@ Deliverables:
    - `ERROR` node placement is stable
    - parse continues after error
    - diagnostics stay deterministic in strict/permissive modes
+
+Status:
+- Added malformed edge fixtures in `tests/_shared_cases.py`:
+  - `edge_case_recovery_between_valid_statements`
+  - `edge_case_missing_value_then_invalid_operator`
+- Added deterministic parser assertions in `tests/test_parser.py`:
+  - top-level `ERROR` node placement is stable between valid statements
+  - strict/permissive warning diagnostics assert exact code/severity/category
+  - duplicate diagnostics at the same token start are suppressed
+- Biome parity alignment:
+  - parser diagnostic de-duplication at same position now matches Biome behavior.
 
 ## AST Consumer Follow-on (after Phase 4)
 Goal: actively consume Phase 1 model aliases in downstream AST APIs.
@@ -121,6 +132,33 @@ Constraints:
 - Canonical AST ordering stays source-of-truth; all object/array forms remain derived views.
 - Keep Biome parity boundaries explicit in `docs/BIOME_PARITY.md`.
 
+Biome-practical implementation guidance:
+1. Mirror Biome layering, not Biome syntax:
+   - keep one parse/lower pipeline and build consumer views on top (similar intent to Biome `Parse<T>` + typed wrappers).
+2. Avoid hidden coercion:
+   - offer explicit view calls (`as_object()`, `as_multimap()`, `as_array()`) rather than implicit property mutation.
+3. Keep views lightweight:
+   - no deep copies unless required; preserve references to canonical AST nodes where feasible.
+4. Make diagnostics/tooling-friendly outputs:
+   - consumer helpers should return deterministic empty/None/error states for mixed/ambiguous shapes.
+5. Prepare for future linter/formatter integration:
+   - consumer API should be safe for repeated use from multiple tools without side effects.
+
+Suggested execution plan for next agent (single phase):
+1. Add `jominipy/ast/views.py` with:
+   - `AstBlockView` (wraps `AstBlock`)
+   - object/multimap/array accessors
+   - scalar helper accessors that preserve quoted-default interpretation policy
+2. Add `tests/test_ast_views.py`:
+   - shape/view selection tests
+   - repeated-key `modifier` multimap behavior
+   - deterministic behavior for mixed and empty blocks
+   - quoted vs unquoted scalar helper behavior
+3. Keep `tests/test_ast.py` focused on core lowering/model semantics and move consumer assertions into `test_ast_views.py`.
+4. Update docs:
+   - `docs/BIOME_PARITY.md` consumer integration row statuses
+   - `docs/HANDOFF.md` with next command sequence and any constraints discovered
+
 ## Phase 5: Docs and parity governance
 Goal: keep architecture and parity docs accurate after each phase.
 
@@ -132,8 +170,8 @@ Deliverables each phase:
 
 ## Suggested command sequence for next agent
 1. `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py`
-2. Implement one phase only (start with Phase 4).
+2. Implement one phase only (start with AST Consumer Follow-on).
 3. `uv run ruff check tests jominipy`
 4. `uv run pyrefly check`
 5. Re-run targeted tests for changed modules, then full test trio again.
-6. After Phase 4 lands, begin AST Consumer Follow-on scope.
+6. After AST consumer APIs land, update docs and handoff with next sequencing.

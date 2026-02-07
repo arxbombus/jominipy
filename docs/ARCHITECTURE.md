@@ -59,7 +59,7 @@ The design goal is not “parsing that works”, but a system that is:
 - Implemented AST Phase 2 scalar hardening in `ast/scalar.py`: explicit scalar kind model (`unknown`/`bool`/`number`/`date_like`) and quoted-default non-coercion with opt-in coercion.
 - Implemented Phase 3 red wrappers in `cst/red.py` and migrated AST lowering to wrappers in `ast/lower.py`.
 - Implemented centralized cross-pipeline test cases and debug helpers: `tests/_shared_cases.py`, `tests/_debug.py`.
-- Remaining major gap: recovery/diagnostic hardening coverage.
+- Remaining major gap: AST consumer follow-on APIs over Phase 1/2/3 AST foundations.
 
 ## jominipy types (current and intended)
 The types below are chosen to mirror Biome’s *two-phase trivia model* and to prevent common category errors.
@@ -177,6 +177,27 @@ Responsibilities:
 Non-responsibilities:
 - AST should not be the source of truth for formatting. Formatting comes from CST tokens + trivia.
 
+## Biome in practice: consumer wiring
+Biome does not add a separate semantic tree between parser and tools. Instead, it composes tools around a shared parsed root and typed syntax wrappers.
+
+Practical shape in Biome:
+1. Parse once into a reusable parse result:
+   - `biome_js_parser::Parse<T>` (`references/biome/crates/biome_js_parser/src/parse.rs`)
+   - cache-aware parsing (`parse_js_with_cache`) and typed access (`Parse<T>::tree()`).
+2. Use generated typed syntax wrappers as the main consumer API:
+   - `biome_js_syntax` re-exports generated node wrappers (`generated::*`).
+3. Run analyzer rules on the parsed language root:
+   - `biome_js_analyze::{analyze, analyze_with_inspect_matcher}`
+   - both consume `LanguageRoot<JsLanguage>`.
+4. Run formatter rules on the same syntax tree:
+   - node-level rule trait (`FormatNodeRule`) and top-level `format_node(...)`.
+5. Orchestrate all of the above in service handlers:
+   - `biome_service` JS file handler calls parser/analyzer/formatter from one parse lifecycle.
+
+Implication for jominipy:
+- AST consumers should be thin, typed query surfaces over canonical AST, not a second parser.
+- Linter/formatter/CLI should consume these views from one parse/lower result rather than re-deriving structure independently.
+
 ## jomini-specific commitments
 - Comments are trivia (not statements) for CST losslessness and Biome alignment.
 - Repeated keys are preserved as separate statements; no merging in CST.
@@ -209,8 +230,9 @@ Paths below are relative to the repository root.
   - lowering ported to red wrappers (implemented Phase 3)
 
 ## Next steps
-1. Expand recovery tests:
-   - assert `ERROR` node placement and continued parse after malformed input
+1. Build AST consumer/query surface:
+   - add `jominipy/ast/views.py` over existing `AstBlock` coercion helpers
+   - add `tests/test_ast_views.py` for object/multimap/array consumers
 2. Maintain explicit parity tracking:
    - update `docs/BIOME_PARITY.md` for each parser/CST/AST feature change
    - record any intentional deviations with rationale and tests

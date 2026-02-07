@@ -12,7 +12,7 @@ from jominipy.ast.model import (
     AstTaggedBlockValue,
     AstValue,
 )
-from jominipy.cst import GreenNode, GreenToken
+from jominipy.cst import GreenNode, SyntaxNode, SyntaxToken, from_green
 from jominipy.parser import parse_jomini
 from jominipy.syntax import JominiSyntaxKind
 
@@ -32,10 +32,16 @@ _ASSIGNMENT_OPERATORS: frozenset[JominiSyntaxKind] = frozenset(
 
 def parse_to_ast(text: str) -> AstSourceFile:
     parsed = parse_jomini(text)
-    return lower_tree(parsed.root)
+    syntax_root = from_green(parsed.root, text)
+    return lower_syntax_tree(syntax_root)
 
 
 def lower_tree(root: GreenNode) -> AstSourceFile:
+    syntax_root = from_green(root)
+    return lower_syntax_tree(syntax_root)
+
+
+def lower_syntax_tree(root: SyntaxNode) -> AstSourceFile:
     source_file = _first_child_node(root, JominiSyntaxKind.SOURCE_FILE)
     if source_file is None:
         return AstSourceFile(statements=())
@@ -47,10 +53,10 @@ def lower_tree(root: GreenNode) -> AstSourceFile:
     return AstSourceFile(statements=_lower_statement_list(statement_list))
 
 
-def _lower_statement_list(node: GreenNode) -> tuple[AstStatement, ...]:
+def _lower_statement_list(node: SyntaxNode) -> tuple[AstStatement, ...]:
     statements: list[AstStatement] = []
     for child in node.children:
-        if not isinstance(child, GreenNode):
+        if not isinstance(child, SyntaxNode):
             continue
 
         if child.kind == JominiSyntaxKind.KEY_VALUE:
@@ -72,25 +78,25 @@ def _lower_statement_list(node: GreenNode) -> tuple[AstStatement, ...]:
     return tuple(statements)
 
 
-def _lower_key_value(node: GreenNode) -> AstStatement:
-    key_node: GreenNode | None = None
+def _lower_key_value(node: SyntaxNode) -> AstStatement:
+    key_node: SyntaxNode | None = None
     key_index = -1
     operator: str | None = None
-    value_node: GreenNode | None = None
+    value_node: SyntaxNode | None = None
 
     for index, child in enumerate(node.children):
-        if key_node is None and isinstance(child, GreenNode):
+        if key_node is None and isinstance(child, SyntaxNode):
             if child.kind == JominiSyntaxKind.SCALAR:
                 key_node = child
                 key_index = index
             continue
 
-        if operator is None and isinstance(child, GreenToken):
+        if operator is None and isinstance(child, SyntaxToken):
             if child.kind in _ASSIGNMENT_OPERATORS:
                 operator = child.text
             continue
 
-        if value_node is None and isinstance(child, GreenNode):
+        if value_node is None and isinstance(child, SyntaxNode):
             if index <= key_index:
                 continue
             if child.kind in {
@@ -108,7 +114,7 @@ def _lower_key_value(node: GreenNode) -> AstStatement:
     return AstKeyValue(key=key, operator=operator, value=value)
 
 
-def _lower_value(node: GreenNode | None) -> AstValue | None:
+def _lower_value(node: SyntaxNode | None) -> AstValue | None:
     if node is None:
         return None
 
@@ -124,19 +130,19 @@ def _lower_value(node: GreenNode | None) -> AstValue | None:
     return None
 
 
-def _lower_block(node: GreenNode) -> AstBlock:
+def _lower_block(node: SyntaxNode) -> AstBlock:
     statement_list = _first_child_node(node, JominiSyntaxKind.STATEMENT_LIST)
     if statement_list is None:
         return AstBlock(statements=())
     return AstBlock(statements=_lower_statement_list(statement_list))
 
 
-def _lower_tagged_block_value(node: GreenNode) -> AstTaggedBlockValue:
-    tag_node: GreenNode | None = None
-    block_node: GreenNode | None = None
+def _lower_tagged_block_value(node: SyntaxNode) -> AstTaggedBlockValue:
+    tag_node: SyntaxNode | None = None
+    block_node: SyntaxNode | None = None
 
     for child in node.children:
-        if not isinstance(child, GreenNode):
+        if not isinstance(child, SyntaxNode):
             continue
         if tag_node is None and child.kind == JominiSyntaxKind.SCALAR:
             tag_node = child
@@ -153,12 +159,12 @@ def _lower_tagged_block_value(node: GreenNode) -> AstTaggedBlockValue:
     return AstTaggedBlockValue(tag=tag, block=block)
 
 
-def _lower_scalar(node: GreenNode) -> AstScalar:
+def _lower_scalar(node: SyntaxNode) -> AstScalar:
     token_kinds: list[JominiSyntaxKind] = []
     parts: list[str] = []
 
     for child in node.children:
-        if not isinstance(child, GreenToken):
+        if not isinstance(child, SyntaxToken):
             continue
         token_kinds.append(child.kind)
         parts.append(child.text)
@@ -173,21 +179,21 @@ def _lower_scalar(node: GreenNode) -> AstScalar:
     )
 
 
-def _first_child_node(node: GreenNode, kind: JominiSyntaxKind) -> GreenNode | None:
+def _first_child_node(node: SyntaxNode, kind: JominiSyntaxKind) -> SyntaxNode | None:
     for child in node.children:
-        if isinstance(child, GreenNode) and child.kind == kind:
+        if isinstance(child, SyntaxNode) and child.kind == kind:
             return child
     return None
 
 
-def _collect_node_text(node: GreenNode) -> str:
+def _collect_node_text(node: SyntaxNode) -> str:
     parts: list[str] = []
     for child in node.children:
-        if isinstance(child, GreenToken):
+        if isinstance(child, SyntaxToken):
             parts.append(child.text)
         else:
             parts.append(_collect_node_text(child))
     return "".join(parts)
 
 
-__all__ = ["lower_tree", "parse_to_ast"]
+__all__ = ["lower_syntax_tree", "lower_tree", "parse_to_ast"]

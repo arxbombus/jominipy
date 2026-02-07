@@ -1,6 +1,6 @@
 """Typed AST over Jomini CST."""
 
-from jominipy.ast.lower import lower_tree, parse_to_ast
+from jominipy.ast.lower import lower_syntax_tree, lower_tree, parse_to_ast
 from jominipy.ast.model import (
     AstArrayValue,
     AstBlock,
@@ -42,6 +42,7 @@ __all__ = [
     "ScalarInterpretation",
     "ScalarKind",
     "interpret_scalar",
+    "lower_syntax_tree",
     "lower_tree",
     "parse_bool",
     "parse_date_like",

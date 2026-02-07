@@ -30,6 +30,20 @@ PARSER_EXPECTED_VALUE: Final[DiagnosticSpec] = DiagnosticSpec(
     category="parser",
 )
 
+PARSER_EXPECTED_TOKEN: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="PARSER_EXPECTED_TOKEN",
+    message="Expected token",
+    severity="error",
+    category="parser",
+)
+
+PARSER_UNEXPECTED_TOKEN: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="PARSER_UNEXPECTED_TOKEN",
+    message="Unexpected token",
+    severity="error",
+    category="parser",
+)
+
 PARSER_LEGACY_EXTRA_RBRACE: Final[DiagnosticSpec] = DiagnosticSpec(
     code="PARSER_LEGACY_EXTRA_RBRACE",
     message="Ignoring extra closing brace in permissive mode",
