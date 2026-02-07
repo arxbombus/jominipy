@@ -12,9 +12,10 @@ from jominipy.parser.jomini import parse_jomini
 from jominipy.parser.marker import CompletedMarker, Marker
 from jominipy.parser.options import ParseMode, ParserOptions
 from jominipy.parser.parse import build_lossless_tree
+from jominipy.parser.parse_lists import ParseNodeList
 from jominipy.parser.parse_recovery import ParseRecoveryTokenSet, RecoveryError
 from jominipy.parser.parsed_syntax import ParsedSyntax
-from jominipy.parser.parser import Parser, ParserProgress
+from jominipy.parser.parser import Parser, ParserCheckpoint, ParserProgress
 from jominipy.parser.token_source import TokenSource, TokenSourceCheckpoint
 from jominipy.parser.tree_sink import LosslessTreeSink, ParsedGreenTree
 
@@ -25,10 +26,12 @@ __all__ = [
     "LosslessTreeSink",
     "Marker",
     "ParseMode",
+    "ParseNodeList",
     "ParseRecoveryTokenSet",
     "ParsedGreenTree",
     "ParsedSyntax",
     "Parser",
+    "ParserCheckpoint",
     "ParserOptions",
     "ParserProgress",
     "RecoveryError",

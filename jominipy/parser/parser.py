@@ -1,5 +1,6 @@
 """Event-based parser core."""
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from jominipy.diagnostics import Diagnostic
@@ -8,7 +9,7 @@ from jominipy.parser.event import Event, StartEvent, TokenEvent
 from jominipy.parser.marker import Marker
 from jominipy.parser.options import ParserOptions
 from jominipy.parser.parsed_syntax import ParsedSyntax
-from jominipy.parser.token_source import TokenSource
+from jominipy.parser.token_source import TokenSource, TokenSourceCheckpoint
 from jominipy.syntax import JominiSyntaxKind
 from jominipy.text import TextRange, TextSize
 
@@ -18,6 +19,14 @@ class ParserContext:
     source: TokenSource
     events: list[Event]
     diagnostics: list[Diagnostic]
+
+
+@dataclass(frozen=True, slots=True)
+class ParserCheckpoint:
+    source_checkpoint: TokenSourceCheckpoint
+    events_len: int
+    diagnostics_len: int
+    speculative_depth: int
 
 
 @dataclass(slots=True)
@@ -107,6 +116,28 @@ class Parser:
         pos = len(self._events)
         self._events.append(StartEvent.tombstone())
         return Marker(pos=pos, start=self.position, old_start=pos)
+
+    def checkpoint(self) -> ParserCheckpoint:
+        return ParserCheckpoint(
+            source_checkpoint=self._source.checkpoint,
+            events_len=len(self._events),
+            diagnostics_len=len(self._diagnostics),
+            speculative_depth=self._speculative_depth,
+        )
+
+    def rewind(self, checkpoint: ParserCheckpoint) -> None:
+        self._source.rewind(checkpoint.source_checkpoint)
+        del self._events[checkpoint.events_len :]
+        del self._diagnostics[checkpoint.diagnostics_len :]
+        self._speculative_depth = checkpoint.speculative_depth
+
+    @contextmanager
+    def speculative_parsing(self):
+        self._speculative_depth += 1
+        try:
+            yield
+        finally:
+            self._speculative_depth -= 1
 
     def bump(self) -> None:
         if self.current == TokenKind.EOF:

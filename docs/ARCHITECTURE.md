@@ -43,6 +43,13 @@ The design goal is not “parsing that works”, but a system that is:
 8) Red wrappers: navigation and text/trivia queries
 9) AST: typed layer over red CST nodes
 
+## Implementation status (current)
+- Implemented: `lexer.py`, `buffered_lexer.py`, `parser/token_source.py`, `parser/event.py`, `parser/marker.py`, `parser/parser.py`, `parser/parse_recovery.py`, `parser/parse_lists.py`, `parser/tree_sink.py`, `cst/green.py`, `parser/jomini.py`.
+- Implemented parser modes: `strict` and `permissive` (`parser/options.py`).
+- Implemented parser recovery: token-set based recovery into `ERROR` nodes, with line-break recovery support.
+- Implemented parser-level checkpoints/rewind and speculative-parse guards.
+- Deferred by design: AST layer (`jominipy/ast/`), until CST/parser behavior is finalized.
+
 ## jominipy types (current and intended)
 The types below are chosen to mirror Biome’s *two-phase trivia model* and to prevent common category errors.
 
@@ -164,23 +171,48 @@ Non-responsibilities:
 - Repeated keys are preserved as separate statements; no merging in CST.
 - Blocks are represented uniformly as `ClauseVal` with ordered children; list/object/mixed is derived later.
 
-## Project layout (planned, matches current package layout)
+## Project layout (current + planned)
 Paths below are relative to the repository root.
 
 - `jominipy/jominipy/text/`
   - `text.py`: `TextSize`, `TextRange`, slicing helpers
 - `jominipy/jominipy/lexer/`
   - `tokens.py`: `TokenKind`, `TriviaKind`, `TokenFlags`, `Token`, `Trivia`, `TriviaPiece`
-  - `lexer.py`: core lexer (to implement)
-  - `buffered_lexer.py`: lookahead/checkpoints (to implement)
+  - `lexer.py`: core lexer (implemented)
+  - `buffered_lexer.py`: lookahead/checkpoints (implemented)
 - `jominipy/jominipy/parser/`
-  - `token_source.py`: trivia filtering + trivia_list ownership (to implement)
-  - `event.py`, `marker.py`, `parsed_syntax.py`, `parser.py`: event parser (to implement)
-  - `tree_sink.py`: lossless sink (to implement)
+  - `token_source.py`: trivia filtering + trivia_list ownership (implemented)
+  - `event.py`, `marker.py`, `parsed_syntax.py`, `parser.py`: event parser core (implemented)
+  - `parse_recovery.py`: Biome-style token-set recovery (implemented)
+  - `parse_lists.py`: Biome-style reusable node-list parse loops (implemented)
+  - `options.py`: parser mode/feature options (implemented)
+  - `grammar.py`: Jomini grammar routines + diagnostics policy (implemented, evolving)
+  - `tree_sink.py`: lossless sink (implemented)
 - `jominipy/jominipy/cst/`
-  - green storage, red wrappers, builder (to implement)
+  - `green.py`: green storage + builder (implemented)
+  - red wrappers: planned
 - `jominipy/jominipy/ast/`
-  - typed AST wrappers (to implement)
+  - typed AST wrappers (planned; intentionally deferred)
+
+## Next steps
+1. Finalize parser/CST contract before AST:
+   - lock strict/permissive policy per edge case
+   - keep `docs/EDGE_CASES_FAILURE.md` and tests in sync
+2. Improve Biome parity in parser mechanics:
+   - add explicit parser checkpoints/rewind/speculative parsing API at parser level
+   - keep `ParseNodeList` as the active abstraction for Jomini statement/block lists
+   - defer `ParseSeparatedList` until a concrete separator-driven grammar use case is introduced
+3. Expand recovery tests:
+   - assert `ERROR` node placement and continued parse after malformed input
+4. Add red CST wrappers:
+   - typed navigation/query API over green nodes/tokens
+5. Implement AST (after the above are stable):
+   - typed wrappers over CST
+   - delayed scalar interpretation (bool/number/date-like/string)
+   - preserve CST as source of truth for formatting
+6. Maintain explicit parity tracking:
+   - update `docs/BIOME_PARITY.md` for each parser/CST/AST feature change
+   - record any intentional deviations with rationale and tests
 
 ## Practical guidance (engineering discipline)
 - Keep each layer “boringly single-purpose”. If a module starts needing knowledge from two layers, split it.

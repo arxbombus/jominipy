@@ -2,10 +2,26 @@ import os
 import textwrap
 
 from jominipy.cst import GreenNode, GreenToken
-from jominipy.parser import ParseMode, parse_jomini
+from jominipy.diagnostics import Diagnostic
+from jominipy.lexer import BufferedLexer, Lexer, TokenKind
+from jominipy.parser import (
+    ParseMode,
+    Parser,
+    ParseRecoveryTokenSet,
+    ParserOptions,
+    RecoveryError,
+    TokenSource,
+    parse_jomini,
+)
 from jominipy.syntax import JominiSyntaxKind
 
 PRINT_CST = os.getenv("PRINT_CST", "0").lower() in {"1", "true", "yes", "on"}
+PRINT_DIAGNOSTICS = os.getenv("PRINT_DIAGNOSTICS", "0").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 
 def _dump_cst(node: GreenNode) -> str:
@@ -41,6 +57,17 @@ def _debug_print_cst_if_enabled(test_name: str, source: str, root: GreenNode) ->
     print(_dump_cst(root))
 
 
+def _debug_print_diagnostics_if_enabled(test_name: str, diagnostics: list[Diagnostic]) -> None:
+    if not PRINT_DIAGNOSTICS:
+        return
+    print(f"===== {test_name} DIAGNOSTICS =====")
+    if not diagnostics:
+        print("(none)")
+        return
+    for diagnostic in diagnostics:
+        print(diagnostic)
+
+
 def _collect_node_kinds(root: GreenNode) -> list[JominiSyntaxKind]:
     kinds: list[JominiSyntaxKind] = []
 
@@ -71,12 +98,14 @@ def _collect_tokens(root: GreenNode) -> list[GreenToken]:
 def _assert_parse_ok(name: str, source: str) -> None:
     parsed = parse_jomini(source)
     _debug_print_cst_if_enabled(name, source, parsed.root)
+    _debug_print_diagnostics_if_enabled(name, parsed.diagnostics)
     assert parsed.diagnostics == []
 
 
 def _assert_parse_fails(name: str, source: str) -> None:
     parsed = parse_jomini(source)
     _debug_print_cst_if_enabled(name, source, parsed.root)
+    _debug_print_diagnostics_if_enabled(name, parsed.diagnostics)
     assert parsed.diagnostics != []
 
 
@@ -404,11 +433,16 @@ def test_save_header_then_data() -> None:
     _assert_parse_ok("save_header_then_data", src)
 
 
-
-
 def test_semicolon_after_quoted_scalar() -> None:
     src = 'textureFile3 = "gfx//mapitems//trade_terrain.dds";\n'
-    _assert_parse_ok("semicolon_after_quoted_scalar", src)
+    _assert_parse_fails("semicolon_after_quoted_scalar", src)
+
+
+def test_semicolon_after_quoted_scalar_is_tolerated_in_permissive_mode() -> None:
+    src = 'textureFile3 = "gfx//mapitems//trade_terrain.dds";\n'
+    parsed = parse_jomini(src, mode=ParseMode.PERMISSIVE)
+    assert parsed.root is not None
+    assert parsed.diagnostics == []
 
 
 def test_edge_case_equal_as_key_fails_in_strict_mode() -> None:
@@ -454,6 +488,21 @@ def test_edge_case_parameter_syntax_fails_for_now() -> None:
     _assert_parse_fails("edge_case_parameter_syntax_fails_for_now", src)
 
 
+def test_edge_case_parameter_syntax_can_be_enabled() -> None:
+    src = textwrap.dedent(
+        """
+        generate_advisor = {
+          [[scaled_skill]
+            $scaled_skill$
+          ]
+          [[!skill] if = {} ]
+        }
+        """
+    ).lstrip()
+    parsed = parse_jomini(src, options=ParserOptions(allow_parameter_syntax=True))
+    assert parsed.diagnostics == []
+
+
 def test_edge_case_unmarked_list_form_fails_for_now() -> None:
     src = textwrap.dedent(
         """
@@ -464,6 +513,12 @@ def test_edge_case_unmarked_list_form_fails_for_now() -> None:
         """
     ).lstrip()
     _assert_parse_fails("edge_case_unmarked_list_form_fails_for_now", src)
+
+
+def test_edge_case_unmarked_list_form_can_be_enabled() -> None:
+    src = 'pattern = list "christian_emblems_list"\n'
+    parsed = parse_jomini(src, options=ParserOptions(allow_unmarked_list_form=True))
+    assert parsed.diagnostics == []
 
 
 def test_edge_case_alternating_value_and_key_value_is_accepted() -> None:
@@ -490,3 +545,43 @@ def test_edge_case_stray_definition_line_fails_in_strict_mode() -> None:
         """
     ).lstrip()
     _assert_parse_fails("edge_case_stray_definition_line_fails_in_strict_mode", src)
+
+
+def test_recovery_creates_error_node_and_continues_parsing() -> None:
+    src = "a=1 ?=oops\nb=2\n"
+    parsed = parse_jomini(src)
+    _debug_print_diagnostics_if_enabled("recovery_creates_error_node_and_continues_parsing", parsed.diagnostics)
+
+    kinds = _collect_node_kinds(parsed.root)
+    assert parsed.diagnostics != []
+    assert JominiSyntaxKind.ERROR in kinds
+    assert kinds.count(JominiSyntaxKind.KEY_VALUE) == 2
+
+
+def test_parser_checkpoint_rewind_restores_stream_and_events() -> None:
+    source = TokenSource(BufferedLexer(Lexer("foo=1")))
+    parser = Parser(source)
+
+    checkpoint = parser.checkpoint()
+    parser.bump()
+    parser.bump()
+    parser.rewind(checkpoint)
+
+    assert parser.current == TokenKind.IDENTIFIER
+    assert len(parser.events) == 0
+    assert parser.diagnostics == []
+
+
+def test_recovery_is_disabled_during_speculative_parsing() -> None:
+    source = TokenSource(BufferedLexer(Lexer("?=oops")))
+    parser = Parser(source)
+    recovery = ParseRecoveryTokenSet(
+        node_kind=JominiSyntaxKind.ERROR,
+        recovery_set=frozenset({TokenKind.EOF}),
+    )
+
+    with parser.speculative_parsing():
+        recovered, error = recovery.recover(parser)
+
+    assert recovered is None
+    assert error == RecoveryError.RECOVERY_DISABLED

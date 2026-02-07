@@ -12,8 +12,10 @@ from jominipy.diagnostics.codes import (
 )
 from jominipy.lexer import TokenKind
 from jominipy.parser.marker import CompletedMarker
+from jominipy.parser.parse_lists import ParseNodeList
 from jominipy.parser.parse_recovery import ParseRecoveryTokenSet
-from jominipy.parser.parser import Parser, ParserProgress
+from jominipy.parser.parsed_syntax import ParsedSyntax
+from jominipy.parser.parser import Parser
 from jominipy.syntax import JominiSyntaxKind
 
 ASSIGNMENT_OPERATORS: frozenset[TokenKind] = frozenset(
@@ -42,7 +44,7 @@ def parse_source_file(parser: Parser) -> None:
         parser,
         stop_at=frozenset({TokenKind.EOF}),
         allow_bare_scalars=True,
-        restrict_bare_scalars_after_key_value=True,
+        restrict_bare_scalars_after_key_value=not parser.options.allow_bare_scalar_after_key_value,
     )
     root.complete(parser, JominiSyntaxKind.SOURCE_FILE)
 
@@ -54,8 +56,6 @@ def parse_statement_list(
     allow_bare_scalars: bool = True,
     restrict_bare_scalars_after_key_value: bool = False,
 ) -> CompletedMarker:
-    marker = parser.start()
-    progress = ParserProgress()
     has_seen_key_value = False
 
     recovery_set = set(stop_at)
@@ -67,29 +67,39 @@ def parse_statement_list(
         recovery_set=frozenset(recovery_set),
     ).enable_recovery_on_line_break()
 
-    while not parser.at(TokenKind.EOF) and not parser.at_set(stop_at):
-        progress.assert_progressing(parser)
+    def parse_element(current: Parser) -> ParsedSyntax:
+        nonlocal has_seen_key_value
 
-        if parser.options.allow_semicolon_terminator and parser.at(TokenKind.SEMICOLON):
-            parser.bump()
-            continue
+        if current.options.allow_semicolon_terminator and current.at(TokenKind.SEMICOLON):
+            current.bump()
+            return ParsedSyntax.present()
 
         statement_allow_bare = allow_bare_scalars and (
             not restrict_bare_scalars_after_key_value or not has_seen_key_value
         )
-        parsed = parse_statement(parser, allow_bare_scalars=statement_allow_bare)
+        parsed = parse_statement(current, allow_bare_scalars=statement_allow_bare)
 
         if parsed.present:
             if parsed.is_key_value:
                 has_seen_key_value = True
-            continue
+            return ParsedSyntax.present()
 
-        parser.error(_unexpected_token(parser))
-        _, recovery_error = recovery.recover(parser)
-        if recovery_error is not None:
-            break
+        return ParsedSyntax.absent()
 
-    return marker.complete(parser, JominiSyntaxKind.STATEMENT_LIST)
+    def recover_element(current: Parser, parsed: ParsedSyntax) -> bool:
+        if parsed.is_present():
+            return True
+
+        current.error(_unexpected_token(current))
+        _, recovery_error = recovery.recover(current)
+        return recovery_error is None
+
+    return ParseNodeList(
+        list_kind=JominiSyntaxKind.STATEMENT_LIST,
+        is_at_list_end=lambda current: current.at_set(stop_at),
+        parse_element=parse_element,
+        recover=recover_element,
+    ).parse_list(parser)
 
 
 def parse_statement(parser: Parser, *, allow_bare_scalars: bool) -> StatementParseResult:
@@ -126,7 +136,7 @@ def parse_statement(parser: Parser, *, allow_bare_scalars: bool) -> StatementPar
 
     if allow_bare_scalars:
         scalar_text = key_or_value.text(parser)
-        if _is_parameter_syntax_scalar(scalar_text):
+        if _is_parameter_syntax_scalar(scalar_text) and not parser.options.allow_parameter_syntax:
             parser.error(_unsupported_parameter_syntax(parser))
         return StatementParseResult(present=True)
 
@@ -144,8 +154,11 @@ def parse_value(parser: Parser) -> bool:
         return False
 
     if scalar.text(parser) == "list" and parser.at(TokenKind.STRING):
-        parser.error(_unsupported_unmarked_list_form(parser))
-        return False
+        if not parser.options.allow_unmarked_list_form:
+            parser.error(_unsupported_unmarked_list_form(parser))
+            return False
+        parse_scalar(parser)
+        return True
 
     if parser.at(TokenKind.LBRACE):
         tagged = scalar.precede(parser)
@@ -166,6 +179,7 @@ def parse_block(parser: Parser) -> CompletedMarker:
         parser,
         stop_at=frozenset({TokenKind.RBRACE, TokenKind.EOF}),
         allow_bare_scalars=True,
+        restrict_bare_scalars_after_key_value=not parser.options.allow_alternating_value_key_value,
     )
 
     if parser.at(TokenKind.RBRACE):

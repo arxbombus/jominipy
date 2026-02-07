@@ -7,6 +7,18 @@ Policy:
 - `strict` mode prioritizes deterministic diagnostics.
 - `permissive` mode may tolerate legacy save quirks with warnings.
 
+## Mode matrix (current contract)
+
+| Case | strict | permissive |
+|---|---|---|
+| Semicolon terminator | diagnostic/error | accepted |
+| Extra `}` | diagnostic/error | accepted with warning |
+| Missing `}` | diagnostic/error | accepted with warning |
+| Parameter syntax (`[[...]]`, `$...$`) | diagnostic/error | diagnostic/error (unless explicitly feature-enabled) |
+| Unmarked list form (`list "..."`) | diagnostic/error | diagnostic/error (unless explicitly feature-enabled) |
+| Alternating value + key/value in block | accepted | accepted |
+| Stray bare scalar after key/value (top level) | diagnostic/error | accepted |
+
 ## Tracked Cases
 
 1. Scalar key with only operator characters
@@ -32,11 +44,11 @@ Policy:
 - Examples:
   - `[[scaled_skill] ... ]`
   - `[[!skill] ... ]`
-- Status: unsupported; reserved for a dedicated compatibility mode.
+- Status: unsupported by default; controlled by `ParserOptions.allow_parameter_syntax`.
 
 5. Unmarked list forms
 - Example: `pattern = list "christian_emblems_list"`
-- Status: unsupported in baseline grammar.
+- Status: unsupported by default; controlled by `ParserOptions.allow_unmarked_list_form`.
 
 6. Stray bare identifiers after structured top-level content
 - Example:
@@ -47,6 +59,5 @@ Policy:
 
 ## Notes
 
-- Semicolon statement terminators are supported (e.g. `key = "value";`).
 - Alternating plain values and key-value pairs in nested blocks remains
-  accepted by the baseline parser.
+  accepted in baseline parser mode.
