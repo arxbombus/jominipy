@@ -7,7 +7,7 @@ This roadmap is implementation-first and ordered to minimize rework.
 - AST v1 exists (`jominipy/ast/model.py`, `jominipy/ast/scalar.py`, `jominipy/ast/lower.py`) and lowers from CST.
 - Centralized cross-pipeline cases and debug helpers are in place under `tests/`.
 - Parse-result carrier API is implemented:
-  - `jominipy/pipeline/result.py` (`ParseResultBase`, `JominiScriptParseResult`)
+  - `jominipy/pipeline/result.py` (`ParseResultBase`, `JominiParseResult`)
   - `jominipy/pipeline/results.py` (`LintRunResult`, `FormatRunResult`, `CheckRunResult`)
   - `jominipy/parser/jomini.py` (`parse_result(...)`)
 
@@ -22,7 +22,7 @@ Authoritative deliverables (full proposal):
    - formatter responsibilities (CST/trivia-preserving emission)
    - rules-parser responsibilities (rules DSL to normalized rule IR)
 2. Public API contracts (design-level, before broad implementation):
-   - parse carriers: `ParseResultBase`, `JominiScriptParseResult`, planned `RulesParseResult`
+   - parse carriers: `ParseResultBase`, `JominiParseResult`, planned `RulesParseResult`
    - entrypoints: `run_check`, `run_lint`, `run_format`, planned `run_typecheck`
    - diagnostics contract: severity/category/code consistency and de-dup rules
    - rule result/fix contract: deterministic and machine-applicable edit model
@@ -65,7 +65,7 @@ Authoritative deliverables (full proposal):
    - required evidence to start each subsystem phase (lint, format, typecheck, rules-parser)
 
 Named API direction (approved):
-- Game-script carrier remains Jomini-specific: `JominiScriptParseResult`.
+- Game-script carrier remains Jomini-specific: `JominiParseResult`.
 - Shared cross-domain behavior remains generic: `ParseResultBase`.
 - Rules parser carrier will be separate: `RulesParseResult`.
 - No compatibility aliases are required for this project; direct renames are acceptable.
@@ -92,6 +92,20 @@ Status:
 3. Type-checker fact model + checker diagnostics.
 4. Rules DSL parser + normalized IR + generation pipeline.
 5. Integration and parity hardening.
+
+## Phase 1 Status (in progress)
+- Landed:
+  - shared facts cache on parse carrier (`JominiParseResult.analysis_facts`)
+  - separate type-check runner scaffold (`jominipy/typecheck/runner.py`)
+  - deterministic lint rule registry scaffold with semantic/style split (`jominipy/lint/rules.py`)
+  - entrypoint orchestration update: `run_typecheck(...)` and `run_check(...)` compose typecheck + lint over one parse
+  - validation coverage: `tests/test_lint_typecheck_engines.py`
+- Next:
+  - add rule-domain contract enforcement:
+    - checker rules must be correctness/soundness only
+    - lint rules may be semantic/style/heuristic and may consume checker facts
+    - checker must not depend on lint execution
+  - replace scaffold semantic/style/type rules with CWTools-derived rule IR consumers.
 
 ## Phase 1: AST block/list coercion and repeated-key policy (completed)
 Goal: make AST ergonomic for Jomini data access while preserving CST truth.

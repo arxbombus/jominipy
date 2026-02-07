@@ -11,6 +11,7 @@ from jominipy.parser.options import ParserOptions
 from jominipy.parser.tree_sink import ParsedGreenTree
 
 if TYPE_CHECKING:
+    from jominipy.analysis import AnalysisFacts
     from jominipy.ast import AstBlockView, AstSourceFile
     from jominipy.cst import GreenNode, SyntaxNode
     from jominipy.diagnostics import Diagnostic
@@ -43,6 +44,7 @@ class JominiParseResult(ParseResultBase):
     _syntax_root: SyntaxNode | None = field(default=None, init=False, repr=False)
     _ast_root: AstSourceFile | None = field(default=None, init=False, repr=False)
     _root_view: AstBlockView | None = field(default=None, init=False, repr=False)
+    _analysis_facts: AnalysisFacts | None = field(default=None, init=False, repr=False)
 
     def syntax_root(self) -> SyntaxNode:
         if self._syntax_root is None:
@@ -62,3 +64,10 @@ class JominiParseResult(ParseResultBase):
 
             self._root_view = AstBlockView(AstBlock(statements=self.ast_root().statements))
         return self._root_view
+
+    def analysis_facts(self) -> AnalysisFacts:
+        if self._analysis_facts is None:
+            from jominipy.analysis import build_analysis_facts
+
+            self._analysis_facts = build_analysis_facts(self.ast_root())
+        return self._analysis_facts

@@ -71,3 +71,31 @@ PARSER_UNSUPPORTED_PARAMETER_SYNTAX: Final[DiagnosticSpec] = DiagnosticSpec(
     severity="error",
     category="parser",
 )
+
+TYPECHECK_INCONSISTENT_VALUE_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="TYPECHECK_INCONSISTENT_VALUE_SHAPE",
+    message="Top-level key mixes incompatible value shapes.",
+    severity="warning",
+    category="typecheck",
+)
+
+LINT_SEMANTIC_INCONSISTENT_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LINT_SEMANTIC_INCONSISTENT_SHAPE",
+    message="Semantic rule: mixed value shapes should be normalized.",
+    severity="warning",
+    category="lint/semantic",
+)
+
+LINT_SEMANTIC_MISSING_START_YEAR: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LINT_SEMANTIC_MISSING_START_YEAR",
+    message="Semantic rule: technology blocks should define `start_year`.",
+    severity="warning",
+    category="lint/semantic",
+)
+
+LINT_STYLE_SINGLE_LINE_BLOCK: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LINT_STYLE_SINGLE_LINE_BLOCK",
+    message="Style rule: multi-value blocks should be split across lines.",
+    severity="warning",
+    category="lint/style",
+)

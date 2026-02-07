@@ -2,6 +2,9 @@
 
 from jominipy.diagnostics.codes import (
     LEXER_UNTERMINATED_STRING,
+    LINT_SEMANTIC_INCONSISTENT_SHAPE,
+    LINT_SEMANTIC_MISSING_START_YEAR,
+    LINT_STYLE_SINGLE_LINE_BLOCK,
     PARSER_EXPECTED_TOKEN,
     PARSER_EXPECTED_VALUE,
     PARSER_LEGACY_EXTRA_RBRACE,
@@ -9,6 +12,7 @@ from jominipy.diagnostics.codes import (
     PARSER_UNEXPECTED_TOKEN,
     PARSER_UNSUPPORTED_PARAMETER_SYNTAX,
     PARSER_UNSUPPORTED_UNMARKED_LIST,
+    TYPECHECK_INCONSISTENT_VALUE_SHAPE,
     DiagnosticSpec,
 )
 from jominipy.diagnostics.diagnostic import Diagnostic, Severity
@@ -16,6 +20,9 @@ from jominipy.diagnostics.report import collect_diagnostics, has_errors
 
 __all__ = [
     "LEXER_UNTERMINATED_STRING",
+    "LINT_SEMANTIC_INCONSISTENT_SHAPE",
+    "LINT_SEMANTIC_MISSING_START_YEAR",
+    "LINT_STYLE_SINGLE_LINE_BLOCK",
     "PARSER_EXPECTED_TOKEN",
     "PARSER_EXPECTED_VALUE",
     "PARSER_LEGACY_EXTRA_RBRACE",
@@ -23,6 +30,7 @@ __all__ = [
     "PARSER_UNEXPECTED_TOKEN",
     "PARSER_UNSUPPORTED_PARAMETER_SYNTAX",
     "PARSER_UNSUPPORTED_UNMARKED_LIST",
+    "TYPECHECK_INCONSISTENT_VALUE_SHAPE",
     "Diagnostic",
     "DiagnosticSpec",
     "Severity",

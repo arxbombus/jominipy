@@ -43,7 +43,7 @@ Every agent must perform this checklist before finishing a substantive task:
   - `uv run pyrefly check` (`0 errors`)
   - `uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_ast.py tests/test_cst_red.py tests/test_ast_views.py` (`228 passed`)
 - Parse-result carrier phase is now implemented:
-  - `jominipy/pipeline/result.py`: `ParseResultBase`, `JominiScriptParseResult`
+  - `jominipy/pipeline/result.py`: `ParseResultBase`, `JominiParseResult`
   - `jominipy/pipeline/results.py`: `LintRunResult`, `FormatRunResult`, `CheckRunResult`
   - `jominipy/parser/jomini.py`: new `parse_result(...)` entrypoint
   - `jominipy/parser/__init__.py`: exports `parse_result`
@@ -55,6 +55,17 @@ Every agent must perform this checklist before finishing a substantive task:
   - `jominipy/lint/runner.py`: lint runner skeleton over shared parse lifecycle
   - `jominipy/format/runner.py`: formatter runner skeleton over shared parse lifecycle
   - `tests/test_pipeline_entrypoints.py`: lifecycle and contract coverage
+- Phase 1 execution kickoff landed (engine core + initial scaffolds):
+  - shared facts cache on parse carrier: `JominiParseResult.analysis_facts()`
+  - separate type-check engine scaffold: `jominipy/typecheck/*`
+  - deterministic lint rule registry scaffold consuming type facts: `jominipy/lint/rules.py`
+  - pipeline entrypoint added: `run_typecheck(...)` and `run_check(...)` now composes typecheck + lint with dedupe
+  - validation tests added: `tests/test_lint_typecheck_engines.py`
+- Boundary refinement from latest planning discussion:
+  - type checker is reserved for high-confidence correctness diagnostics
+  - linter is reserved for static analysis policy, semantics, style, and heuristics
+  - linter may consume type facts, but checker must remain independent from lint rules
+  - next implementation step is to enforce this boundary mechanically (rule metadata/contracts + tests), not just by convention
 - Implementation status adjustment:
   - implementation work is now paused
   - current focus is completing the full Phase 0 proposal and gating criteria across docs/memories
@@ -85,11 +96,12 @@ Every agent must perform this checklist before finishing a substantive task:
 ## Next Task (post-Phase-0 kickoff)
 - Phase 0 planning gate is complete.
 - Immediate next step: start Phase 1 execution (lint engine core) under the approved proposal constraints.
+- Immediate next step: continue Phase 1 by enforcing lint/checker rule-domain contracts, then replacing scaffold rules with CWTools-derived rule IR consumers.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule (`start_year` required for HOI4 technology objects)
   3. first style/layout rules (multiline list/array + configurable field order)
-  4. keep one-parse-lifecycle invariant via `JominiScriptParseResult`
+  4. keep one-parse-lifecycle invariant via `JominiParseResult`
 - Biome parity remains a hard architectural constraint during implementation.
 - Naming boundary decision is now explicit:
   - game-script carrier is explicitly `JominiParseResult`

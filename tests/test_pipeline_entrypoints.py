@@ -1,5 +1,5 @@
 from jominipy.parser import ParseMode, parse_result
-from jominipy.pipeline import run_check, run_format, run_lint
+from jominipy.pipeline import run_check, run_format, run_lint, run_typecheck
 
 
 def test_run_lint_reuses_provided_parse_result() -> None:
@@ -10,6 +10,7 @@ def test_run_lint_reuses_provided_parse_result() -> None:
 
     assert result.parse is parsed
     assert result.diagnostics == parsed.diagnostics
+    assert result.type_facts is not None
 
 
 def test_run_lint_rejects_parse_with_mode_or_options() -> None:
@@ -42,3 +43,13 @@ def test_run_check_reports_parse_errors_through_lint_pipeline() -> None:
     assert result.has_errors is True
     assert len(result.diagnostics) == 1
     assert result.diagnostics[0].code == "PARSER_UNEXPECTED_TOKEN"
+
+
+def test_run_typecheck_reuses_provided_parse_result() -> None:
+    source = "a=1\n"
+    parsed = parse_result(source)
+
+    result = run_typecheck("ignored", parse=parsed)
+
+    assert result.parse is parsed
+    assert result.diagnostics == parsed.diagnostics

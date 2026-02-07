@@ -64,7 +64,7 @@ The design goal is not “parsing that works”, but a system that is:
   - `pipeline/result.py` (`ParseResultBase`, `JominiParseResult`)
   - `pipeline/results.py` (`LintRunResult`, `FormatRunResult`, `CheckRunResult`)
   - `parser/jomini.py` (`parse_result(...)`)
-- Remaining major gaps: full analyzer/rule engine, formatter rules pipeline, type checker, and CLI/service orchestration over the shared carrier (pipeline/lint/format scaffolds now exist as thin placeholders).
+- Remaining major gaps: production analyzer/rule engine, formatter rules pipeline, mature type checker rule set, and CLI/service orchestration over the shared carrier (pipeline/lint/format/typecheck scaffolds now exist as thin placeholders).
 
 ## jominipy types (current and intended)
 The types below are chosen to mirror Biome’s *two-phase trivia model* and to prevent common category errors.
