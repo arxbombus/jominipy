@@ -33,7 +33,7 @@ def _resolve_options(
     return ParserOptions()
 
 
-def parse_jomini(
+def parse(
     text: str,
     options: ParserOptions | None = None,
     *,
@@ -68,7 +68,7 @@ def parse_result(
     from jominipy.pipeline import JominiParseResult
 
     resolved_options = _resolve_options(options=options, mode=mode)
-    parsed = parse_jomini(text, options=resolved_options)
+    parsed = parse(text, options=resolved_options)
     return JominiParseResult(
         source_text=text,
         parsed=parsed,

@@ -64,6 +64,10 @@ The design goal is not “parsing that works”, but a system that is:
   - `pipeline/result.py` (`ParseResultBase`, `JominiParseResult`)
   - `pipeline/results.py` (`LintRunResult`, `FormatRunResult`, `CheckRunResult`)
   - `parser/jomini.py` (`parse_result(...)`)
+- Implemented CWTools rules read-only ingest pipeline:
+  - `rules/result.py` (`RulesParseResult`)
+  - `rules/parser.py` + `rules/ir.py` (statement IR + `##`/`###` metadata capture)
+  - `rules/normalize.py` + `rules/load.py` (deterministic indexing + directory ingest)
 - Remaining major gaps: production analyzer/rule engine, formatter rules pipeline, mature type checker rule set, and CLI/service orchestration over the shared carrier (pipeline/lint/format/typecheck scaffolds now exist as thin placeholders).
 
 ## jominipy types (current and intended)

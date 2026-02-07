@@ -102,6 +102,7 @@ Status:
   - validation coverage: `tests/test_lint_typecheck_engines.py`
 - Next:
   - replace scaffold semantic/style/type rules with CWTools-derived rule IR consumers under enforced rule-domain contracts.
+  - consume newly landed read-only rules ingest (`jominipy/rules/*`) instead of ad hoc regex extraction.
 
 ## Phase 1 Boundary Contracts (completed)
 - checker rule contracts are enforced mechanically:

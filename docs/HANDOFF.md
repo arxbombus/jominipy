@@ -74,6 +74,15 @@ Every agent must perform this checklist before finishing a substantive task:
     - `jominipy/lint/runner.py`
   - boundary tests added:
     - `tests/test_lint_typecheck_engines.py` (invalid-domain/confidence rejection)
+- CWTools rules read-only ingest (no engine wiring) landed:
+  - new package: `jominipy/rules/*`
+    - `result.py`: `RulesParseResult` (separate carrier domain from `JominiParseResult`)
+    - `parser.py`: parse `.cwt` text/files and lower to statement IR with comment metadata
+    - `ir.py`: normalized rule IR dataclasses
+    - `normalize.py`: deterministic category indexing over parsed statements
+    - `load.py`: directory/path loaders for `.cwt` inputs
+  - tests:
+    - `tests/test_rules_ingest.py` (comment options/docs attachment + HOI4 sample ingest/indexing)
 - Implementation status adjustment:
   - implementation work is now paused
   - current focus is completing the full Phase 0 proposal and gating criteria across docs/memories
@@ -105,6 +114,7 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 0 planning gate is complete.
 - Immediate next step: start Phase 1 execution (lint engine core) under the approved proposal constraints.
 - Immediate next step: replace scaffold rules with CWTools-derived rule IR consumers under the enforced lint/checker contracts.
+- Immediate next step: map `jominipy/rules` normalized IR into lint/type-check rule registries while preserving one parse/facts lifecycle and domain contracts.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule (`start_year` required for HOI4 technology objects)

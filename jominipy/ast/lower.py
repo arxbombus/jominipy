@@ -13,7 +13,7 @@ from jominipy.ast.model import (
     AstValue,
 )
 from jominipy.cst import GreenNode, SyntaxNode, SyntaxToken, from_green
-from jominipy.parser import parse_jomini
+from jominipy.parser import parse
 from jominipy.syntax import JominiSyntaxKind
 
 _ASSIGNMENT_OPERATORS: frozenset[JominiSyntaxKind] = frozenset(
@@ -31,7 +31,7 @@ _ASSIGNMENT_OPERATORS: frozenset[JominiSyntaxKind] = frozenset(
 
 
 def parse_to_ast(text: str) -> AstSourceFile:
-    parsed = parse_jomini(text)
+    parsed = parse(text)
     syntax_root = from_green(parsed.root, text)
     return lower_syntax_tree(syntax_root)
 

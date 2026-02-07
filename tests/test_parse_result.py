@@ -1,5 +1,5 @@
 from jominipy.ast import AstScalar
-from jominipy.parser import ParseMode, parse_jomini, parse_result
+from jominipy.parser import ParseMode, parse, parse_result
 
 
 def test_parse_result_exposes_green_diagnostics_and_error_state() -> None:
@@ -42,8 +42,8 @@ def test_parse_result_strict_and_permissive_match_parse_jomini_contract() -> Non
     strict_result = parse_result(source)
     permissive_result = parse_result(source, mode=ParseMode.PERMISSIVE)
 
-    strict_parsed = parse_jomini(source)
-    permissive_parsed = parse_jomini(source, mode=ParseMode.PERMISSIVE)
+    strict_parsed = parse(source)
+    permissive_parsed = parse(source, mode=ParseMode.PERMISSIVE)
 
     assert strict_result.diagnostics == strict_parsed.diagnostics
     assert permissive_result.diagnostics == permissive_parsed.diagnostics

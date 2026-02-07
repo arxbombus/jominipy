@@ -48,6 +48,16 @@ For every parser/CST/AST feature, record:
 | Type-checker boundary | `biome_js_semantic/src/*`, `biome_js_type_info/src/*` | `jominipy/typecheck/*` | adapted | Engine scaffold + rule-domain enforcement landed (`correctness` + `sound` contracts) |
 | Rules DSL parsing + generation | `xtask/codegen`, `biome_syntax_codegen/src/*` | planned `jominipy/rules/*` + generation pipeline | pending | Separate DSL parser and normalized IR for generated models/validators |
 
+### Rules ingest status (read-only phase)
+- Landed `jominipy/rules` read-only ingest:
+  - `RulesParseResult` carrier (`jominipy/rules/result.py`)
+  - parsed statement IR + metadata attachment from `##`/`###` comments (`jominipy/rules/parser.py`, `jominipy/rules/ir.py`)
+  - deterministic category index (`jominipy/rules/normalize.py`)
+  - file/directory loaders (`jominipy/rules/load.py`)
+- Status interpretation:
+  - DSL parsing is now `adapted` at ingest/IR level.
+  - code generation and engine consumption remain `pending`.
+
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.
 2. Planned local module boundaries are documented before subsystem implementation.

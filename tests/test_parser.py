@@ -10,7 +10,7 @@ from jominipy.parser import (
     ParserOptions,
     RecoveryError,
     TokenSource,
-    parse_jomini,
+    parse,
 )
 from jominipy.syntax import JominiSyntaxKind
 from tests._debug import debug_dump_cst, debug_dump_diagnostics
@@ -69,14 +69,14 @@ def _collect_tokens(root: GreenNode) -> list[GreenToken]:
 
 
 def _assert_parse_ok(name: str, source: str) -> None:
-    parsed = parse_jomini(source)
+    parsed = parse(source)
     _debug_print_cst_if_enabled(name, source, parsed.root)
     _debug_print_diagnostics_if_enabled(name, parsed.diagnostics)
     assert parsed.diagnostics == []
 
 
 def _assert_parse_fails(name: str, source: str) -> None:
-    parsed = parse_jomini(source)
+    parsed = parse(source)
     _debug_print_cst_if_enabled(name, source, parsed.root)
     _debug_print_diagnostics_if_enabled(name, parsed.diagnostics)
     assert parsed.diagnostics != []
@@ -84,7 +84,7 @@ def _assert_parse_fails(name: str, source: str) -> None:
 
 def test_simple_toml_like_example() -> None:
     src = case_source("simple_toml_like_example")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("simple_toml_like_example", src, parsed.root)
     assert parsed.diagnostics == []
 
@@ -96,7 +96,7 @@ def test_simple_toml_like_example() -> None:
 
 def test_token_text_excludes_leading_trivia() -> None:
     src = "# this is a comment\na = 1\n"
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("token_text_excludes_leading_trivia", src, parsed.root)
     assert parsed.diagnostics == []
 
@@ -111,7 +111,7 @@ def test_token_text_excludes_leading_trivia() -> None:
 
 def test_token_text_excludes_trailing_trivia() -> None:
     src = "a = 1\n"
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("token_text_excludes_trailing_trivia", src, parsed.root)
     assert parsed.diagnostics == []
 
@@ -124,7 +124,7 @@ def test_token_text_excludes_trailing_trivia() -> None:
 
 def test_repeated_key_is_valid() -> None:
     src = case_source("repeated_key_is_valid")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("repeated_key_is_valid", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -133,7 +133,7 @@ def test_repeated_key_is_valid() -> None:
 
 def test_common_scalar_examples() -> None:
     src = case_source("common_scalar_examples")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("common_scalar_examples", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -142,7 +142,7 @@ def test_common_scalar_examples() -> None:
 
 def test_multiple_pairs_per_line() -> None:
     src = case_source("multiple_pairs_per_line")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("multiple_pairs_per_line", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -151,7 +151,7 @@ def test_multiple_pairs_per_line() -> None:
 
 def test_operator_variants() -> None:
     src = case_source("operator_variants")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("operator_variants", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -160,7 +160,7 @@ def test_operator_variants() -> None:
 
 def test_implicit_block_assignment() -> None:
     src = case_source("implicit_block_assignment")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("implicit_block_assignment", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -170,7 +170,7 @@ def test_implicit_block_assignment() -> None:
 
 def test_block_object_and_array_like_content() -> None:
     src = case_source("block_object_and_array_like_content")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("block_object_and_array_like_content", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -180,7 +180,7 @@ def test_block_object_and_array_like_content() -> None:
 
 def test_dense_boundary_characters() -> None:
     src = case_source("dense_boundary_characters")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("dense_boundary_characters", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -190,7 +190,7 @@ def test_dense_boundary_characters() -> None:
 
 def test_comment_inside_quote_is_not_comment() -> None:
     src = case_source("comment_inside_quote_is_not_comment")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("comment_inside_quote_is_not_comment", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -199,7 +199,7 @@ def test_comment_inside_quote_is_not_comment() -> None:
 
 def test_multiline_quoted_scalar() -> None:
     src = case_source("multiline_quoted_scalar")
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_cst_if_enabled("multiline_quoted_scalar", src, parsed.root)
     assert parsed.diagnostics == []
     kinds = _collect_node_kinds(parsed.root)
@@ -308,7 +308,7 @@ def test_semicolon_after_quoted_scalar() -> None:
 
 def test_semicolon_after_quoted_scalar_is_tolerated_in_permissive_mode() -> None:
     src = case_source("semicolon_after_quoted_scalar")
-    parsed = parse_jomini(src, mode=ParseMode.PERMISSIVE)
+    parsed = parse(src, mode=ParseMode.PERMISSIVE)
     assert parsed.root is not None
     assert parsed.diagnostics == []
 
@@ -325,7 +325,7 @@ def test_edge_case_extraneous_closing_brace_fails_in_strict_mode() -> None:
 
 def test_edge_case_extraneous_closing_brace_is_tolerated_in_permissive_mode() -> None:
     src = case_source("edge_case_extraneous_closing_brace_fails_in_strict_mode")
-    parsed = parse_jomini(src, mode=ParseMode.PERMISSIVE)
+    parsed = parse(src, mode=ParseMode.PERMISSIVE)
     assert parsed.root is not None
     assert [d.code for d in parsed.diagnostics] == ["PARSER_LEGACY_EXTRA_RBRACE"]
     assert all(d.severity == "warning" for d in parsed.diagnostics)
@@ -339,7 +339,7 @@ def test_edge_case_missing_closing_brace_fails_in_strict_mode() -> None:
 
 def test_edge_case_missing_closing_brace_is_tolerated_in_permissive_mode() -> None:
     src = case_source("edge_case_missing_closing_brace_fails_in_strict_mode")
-    parsed = parse_jomini(src, mode=ParseMode.PERMISSIVE)
+    parsed = parse(src, mode=ParseMode.PERMISSIVE)
     assert parsed.root is not None
     assert [d.code for d in parsed.diagnostics] == ["PARSER_LEGACY_MISSING_RBRACE"]
     assert all(d.severity == "warning" for d in parsed.diagnostics)
@@ -353,7 +353,7 @@ def test_edge_case_parameter_syntax_fails_for_now() -> None:
 
 def test_edge_case_parameter_syntax_can_be_enabled() -> None:
     src = case_source("edge_case_parameter_syntax_fails_for_now")
-    parsed = parse_jomini(src, options=ParserOptions(allow_parameter_syntax=True))
+    parsed = parse(src, options=ParserOptions(allow_parameter_syntax=True))
     assert parsed.diagnostics == []
 
 
@@ -364,7 +364,7 @@ def test_edge_case_unmarked_list_form_fails_for_now() -> None:
 
 def test_edge_case_unmarked_list_form_can_be_enabled() -> None:
     src = 'pattern = list "christian_emblems_list"\n'
-    parsed = parse_jomini(src, options=ParserOptions(allow_unmarked_list_form=True))
+    parsed = parse(src, options=ParserOptions(allow_unmarked_list_form=True))
     assert parsed.diagnostics == []
 
 
@@ -380,7 +380,7 @@ def test_edge_case_stray_definition_line_fails_in_strict_mode() -> None:
 
 @pytest.mark.parametrize("case", PARSER_CASES, ids=case_id)
 def test_parser_runs_all_central_cases(case: JominiCase) -> None:
-    parsed = parse_jomini(case.source)
+    parsed = parse(case.source)
     _debug_print_cst_if_enabled(f"central::{case.name}", case.source, parsed.root)
     debug_dump_diagnostics(f"central::{case.name}", parsed.diagnostics, source=case.source)
 
@@ -392,7 +392,7 @@ def test_parser_runs_all_central_cases(case: JominiCase) -> None:
 
 def test_recovery_creates_error_node_and_continues_parsing() -> None:
     src = "a=1 ?=oops\nb=2\n"
-    parsed = parse_jomini(src)
+    parsed = parse(src)
     _debug_print_diagnostics_if_enabled("recovery_creates_error_node_and_continues_parsing", parsed.diagnostics)
 
     kinds = _collect_node_kinds(parsed.root)
@@ -407,7 +407,7 @@ def test_recovery_creates_error_node_and_continues_parsing() -> None:
 
 
 def test_recovery_diagnostics_are_deduplicated_at_same_position() -> None:
-    parsed = parse_jomini("a=\n?=oops\nb=2\n")
+    parsed = parse("a=\n?=oops\nb=2\n")
 
     assert [d.code for d in parsed.diagnostics] == ["PARSER_EXPECTED_VALUE"]
     assert all(d.severity == "error" for d in parsed.diagnostics)

@@ -1,5 +1,5 @@
 from jominipy.cst import SyntaxNode, SyntaxToken, from_green
-from jominipy.parser import parse_jomini
+from jominipy.parser import parse
 from jominipy.syntax import JominiSyntaxKind
 
 
@@ -11,7 +11,7 @@ def _first_child_node(node: SyntaxNode, kind: JominiSyntaxKind) -> SyntaxNode | 
 
 
 def test_red_wrappers_navigation_and_siblings() -> None:
-    parsed = parse_jomini("a=1\nb=2\n")
+    parsed = parse("a=1\nb=2\n")
     root = from_green(parsed.root, "a=1\nb=2\n")
 
     source_file = _first_child_node(root, JominiSyntaxKind.SOURCE_FILE)
@@ -29,7 +29,7 @@ def test_red_wrappers_navigation_and_siblings() -> None:
 
 def test_red_wrappers_token_text_and_trivia_views() -> None:
     source = "a = 1 # inline\nb=2\n"
-    parsed = parse_jomini(source)
+    parsed = parse(source)
     root = from_green(parsed.root, source)
 
     tokens = root.descendants_tokens()

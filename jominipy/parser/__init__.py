@@ -8,7 +8,7 @@ from jominipy.parser.event import (
     process_events,
 )
 from jominipy.parser.grammar import parse_source_file, parse_statement_list
-from jominipy.parser.jomini import parse_jomini, parse_result
+from jominipy.parser.jomini import parse, parse_result
 from jominipy.parser.marker import CompletedMarker, Marker
 from jominipy.parser.options import ParseMode, ParserOptions
 from jominipy.parser.parse import build_lossless_tree
@@ -40,7 +40,7 @@ __all__ = [
     "TokenSource",
     "TokenSourceCheckpoint",
     "build_lossless_tree",
-    "parse_jomini",
+    "parse",
     "parse_result",
     "parse_source_file",
     "parse_statement_list",

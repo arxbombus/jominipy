@@ -12,7 +12,7 @@ from jominipy.ast import (
     parse_date_like,
     parse_to_ast,
 )
-from jominipy.parser import parse_jomini
+from jominipy.parser import parse
 from tests._debug import debug_dump_ast, debug_dump_cst, debug_dump_diagnostics
 from tests._shared_cases import ALL_JOMINI_CASES, JominiCase, case_id
 
@@ -87,7 +87,7 @@ def test_ast_preserves_quoted_vs_unquoted_scalar_distinction() -> None:
 
 
 def test_ast_lowers_partial_tree_from_recovered_parse() -> None:
-    parsed = parse_jomini("a=1 ?=oops\nb=2\n")
+    parsed = parse("a=1 ?=oops\nb=2\n")
     assert parsed.diagnostics
 
     ast = lower_tree(parsed.root)
@@ -150,7 +150,7 @@ def test_interpret_scalar_quoted_default_and_opt_in_behavior() -> None:
 
 @pytest.mark.parametrize("case", ALL_JOMINI_CASES, ids=case_id)
 def test_ast_lowers_all_central_cases(case: JominiCase) -> None:
-    parsed = parse_jomini(case.source)
+    parsed = parse(case.source)
     ast = lower_tree(parsed.root)
 
     debug_dump_cst(f"ast_case::{case.name}", case.source, parsed.root)

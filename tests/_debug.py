@@ -19,6 +19,7 @@ from jominipy.ast import (
 from jominipy.cst import GreenNode, GreenToken
 from jominipy.diagnostics import Diagnostic
 from jominipy.lexer import Token, token_text
+from jominipy.rules import RuleSetIR
 
 PRINT_TOKENS = os.getenv("PRINT_TOKENS", "0").lower() in {"1", "true", "yes", "on"}
 PRINT_CST = os.getenv("PRINT_CST", "0").lower() in {"1", "true", "yes", "on"}
@@ -31,6 +32,12 @@ PRINT_DIAGNOSTICS = os.getenv("PRINT_DIAGNOSTICS", "0").lower() in {
     "on",
 }
 PRINT_AST_VIEWS = os.getenv("PRINT_AST_VIEWS", "0").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+PRINT_RULES_IR = os.getenv("PRINT_RULES_IR", "0").lower() in {
     "1",
     "true",
     "yes",
@@ -101,6 +108,13 @@ def debug_dump_ast_block_view(
         debug_print_source(test_name, source)
     print(f"\n===== {test_name} AST VIEW =====")
     print(_dump_ast_block_view(view))
+
+
+def debug_dump_rules_ir(test_name: str, ruleset: RuleSetIR) -> None:
+    if not PRINT_RULES_IR:
+        return
+    print(f"\n===== {test_name} RULES IR =====")
+    print(_dump_rules_ir(ruleset))
 
 
 def _dump_cst(node: GreenNode) -> str:
@@ -233,3 +247,23 @@ def _format_ast_value(value: object) -> str:
     if isinstance(value, AstError):
         return f"Error({value.raw_text!r})"
     return repr(value)
+
+
+def _dump_rules_ir(ruleset: RuleSetIR, with_path: bool = False, with_statement: bool = False) -> str:
+    lines: list[str] = []
+    lines.append(f"files={len(ruleset.files)} indexed={len(ruleset.indexed)}")
+    lines.append("categories:")
+    for category, items in ruleset.by_category.items():
+        lines.append(f"  {category}: {len(items)}")
+    lines.append("indexed:")
+    for item in ruleset.indexed:
+        start = item.source_range.start.value
+        end = item.source_range.end.value
+        family = item.family or "-"
+        argument = item.argument or "-"
+        _path_str = f"{item.source_path}:" if with_path else ""
+        _stmt_str = f", stmt={item.statement!r}" if with_statement else ""
+        lines.append(
+            f"  [{item.category}] {_path_str}{start}-{end} key={item.key!r}, family={family!r}, arg={argument!r}{_stmt_str}"
+        )
+    return "\n".join(lines)
