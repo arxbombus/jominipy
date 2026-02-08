@@ -24,7 +24,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [x] Typecheck service/policy wiring for unresolved checks (asset/reference defer vs strict error modes).
 - [x] Initial resolved-reference correctness in typecheck:
   - [x] `enum[...]` membership checks from cross-file HOI4 schema graph.
-  - [x] `<type_key>` key existence checks from schema + optional injected type-membership sets (for project-level resolution such as `<spriteType>`).
+  - [x] `<type_key>` key existence checks from schema + generic injected type-membership sets (schema-driven `type[...]` discovery; `<spriteType>` is one instance, not a special case).
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
   - [x] Primitive scalar type checks for `int`/`float`/`bool` (historical; now owned by typecheck for correctness).

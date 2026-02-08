@@ -32,3 +32,29 @@ class TypecheckServices:
         default_factory=lambda: MappingProxyType({})
     )
     known_scopes: frozenset[str] = frozenset()
+
+
+def build_typecheck_services_from_file_texts(
+    *,
+    file_texts_by_path: Mapping[str, str],
+    asset_registry: AssetRegistry | None = None,
+    policy: TypecheckPolicy | None = None,
+) -> TypecheckServices:
+    """Build generic type-membership services from schema + project file texts."""
+    from jominipy.rules import (
+        build_type_memberships_from_file_texts,
+        extract_type_definitions,
+        load_hoi4_schema_graph,
+    )
+
+    schema = load_hoi4_schema_graph()
+    type_definitions = extract_type_definitions(schema)
+    memberships = build_type_memberships_from_file_texts(
+        file_texts_by_path=file_texts_by_path,
+        type_definitions_by_key=type_definitions,
+    )
+    return TypecheckServices(
+        asset_registry=asset_registry or NullAssetRegistry(),
+        policy=policy or TypecheckPolicy(),
+        type_memberships_by_key=MappingProxyType(memberships),
+    )

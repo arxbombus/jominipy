@@ -33,6 +33,12 @@ from jominipy.rules.semantics import (
     load_hoi4_required_fields,
     load_hoi4_type_keys,
 )
+from jominipy.rules.type_members import (
+    TypeDefinition,
+    build_type_memberships_from_file_texts,
+    collect_file_texts_under_root,
+    extract_type_definitions,
+)
 
 __all__ = [
     "IndexedRuleStatement",
@@ -49,9 +55,13 @@ __all__ = [
     "RuleStatement",
     "RuleValueSpec",
     "RulesParseResult",
+    "TypeDefinition",
     "build_field_constraints_by_object",
     "build_required_fields_by_object",
     "build_schema_graph",
+    "build_type_memberships_from_file_texts",
+    "collect_file_texts_under_root",
+    "extract_type_definitions",
     "load_hoi4_enum_values",
     "load_hoi4_field_constraints",
     "load_hoi4_required_fields",
