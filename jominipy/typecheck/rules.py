@@ -45,6 +45,9 @@ type TypecheckConfidence = Literal["sound"]
 _VARIABLE_REF_PATTERN = re.compile(r"^[A-Za-z_@][A-Za-z0-9_:@.\-]*$")
 _RANGE_PATTERN = re.compile(r"^(?P<min>-?(?:\d+\.\d+|\d+)|-?inf)\.\.(?P<max>-?(?:\d+\.\d+|\d+)|inf)$")
 _TYPE_REF_PATTERN = re.compile(r"^(?P<prefix>.*)<(?P<type_key>[A-Za-z_][A-Za-z0-9_]*)>(?P<suffix>.*)$")
+_SCOPE_ALIAS_ORDER = ("this", "from", "fromfrom", "fromfromfrom", "fromfromfromfrom")
+_PREV_ALIAS_ORDER = ("prev", "prevprev", "prevprevprev", "prevprevprevprev")
+_SCOPE_ALIAS_KEYS = frozenset((*_SCOPE_ALIAS_ORDER, *_PREV_ALIAS_ORDER, "root"))
 _REFERENCE_SPEC_KINDS = {
     "enum_ref",
     "scope_ref",
@@ -59,6 +62,14 @@ class TypecheckFacts:
     """Type facts produced from shared analysis facts."""
 
     inconsistent_top_level_shapes: dict[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True, slots=True)
+class ScopeContext:
+    """Resolved scope context before evaluating a field path."""
+
+    active_scopes: frozenset[str]
+    aliases: Mapping[str, str]
 
 
 class TypecheckRule(Protocol):
@@ -177,6 +188,7 @@ class FieldReferenceConstraintRule:
     type_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
     value_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
     known_scopes: frozenset[str] = frozenset()
+    field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
     policy: TypecheckPolicy = TypecheckPolicy()
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
@@ -186,6 +198,9 @@ class FieldReferenceConstraintRule:
         enum_values = self.enum_values_by_key or load_hoi4_enum_values()
         known_type_keys = self.known_type_keys or load_hoi4_type_keys()
         known_scopes = self.known_scopes or load_hoi4_known_scopes()
+        scope_constraints = self.field_scope_constraints_by_object
+        if scope_constraints is None:
+            scope_constraints = load_hoi4_field_scope_constraints()
         dynamic_values = _build_dynamic_value_memberships(facts=facts, constraints=constraints)
         merged_value_memberships = _merge_membership_maps(self.value_memberships_by_key, dynamic_values)
 
@@ -208,6 +223,11 @@ class FieldReferenceConstraintRule:
                 )
 
                 for field_fact in field_facts:
+                    relative_path = field_fact.path[1:]
+                    scope_context = _resolve_scope_context_before_path(
+                        relative_path=relative_path,
+                        by_path=scope_constraints.get(object_key, {}),
+                    )
                     if non_reference_specs and _matches_value_specs(
                         field_fact.value,
                         non_reference_specs,
@@ -223,6 +243,7 @@ class FieldReferenceConstraintRule:
                         type_memberships_by_key=self.type_memberships_by_key,
                         value_memberships_by_key=merged_value_memberships,
                         known_scopes=known_scopes,
+                        scope_context=scope_context,
                         policy=self.policy,
                     ):
                         continue
@@ -511,6 +532,7 @@ def _matches_reference_specs(
     type_memberships_by_key: Mapping[str, frozenset[str]],
     value_memberships_by_key: Mapping[str, frozenset[str]],
     known_scopes: frozenset[str],
+    scope_context: ScopeContext,
     policy: TypecheckPolicy,
 ) -> bool:
     return any(
@@ -522,6 +544,7 @@ def _matches_reference_specs(
             type_memberships_by_key=type_memberships_by_key,
             value_memberships_by_key=value_memberships_by_key,
             known_scopes=known_scopes,
+            scope_context=scope_context,
             policy=policy,
         )
         for spec in specs
@@ -537,6 +560,7 @@ def _matches_reference_spec(
     type_memberships_by_key: Mapping[str, frozenset[str]],
     value_memberships_by_key: Mapping[str, frozenset[str]],
     known_scopes: frozenset[str],
+    scope_context: ScopeContext,
     policy: TypecheckPolicy,
 ) -> bool:
     if not isinstance(value, AstScalar):
@@ -580,7 +604,15 @@ def _matches_reference_spec(
             return policy.unresolved_reference == "defer"
         if not known_scopes:
             return policy.unresolved_reference == "defer"
-        return raw.strip().lower() == key.lower()
+        candidate = raw.strip().lower()
+        if candidate in _SCOPE_ALIAS_KEYS:
+            resolved = scope_context.aliases.get(candidate)
+            if resolved is None:
+                return policy.unresolved_reference == "defer"
+            candidate = resolved
+        elif candidate not in known_scopes:
+            return policy.unresolved_reference == "defer"
+        return candidate == key.lower()
 
     if spec.kind == "value_set_ref":
         # Setter declarations register values; they do not require prior membership.
@@ -710,8 +742,16 @@ def _resolve_active_scopes_before_path(
     relative_path: tuple[str, ...],
     by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
 ) -> set[str]:
+    context = _resolve_scope_context_before_path(relative_path=relative_path, by_path=by_path)
+    return set(context.active_scopes)
+
+
+def _resolve_scope_context_before_path(
+    *,
+    relative_path: tuple[str, ...],
+    by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
+) -> ScopeContext:
     aliases: dict[str, str] = {}
-    scope_stack: list[str] = []
     path_prefixes: list[tuple[str, ...]] = [()]
     for i in range(1, len(relative_path)):
         path_prefixes.append(relative_path[:i])
@@ -722,8 +762,26 @@ def _resolve_active_scopes_before_path(
             continue
         if constraint.push_scope:
             for scope in constraint.push_scope:
-                scope_stack.append(scope.lower())
+                _apply_push_scope(aliases, scope.lower())
         if constraint.replace_scope:
             for replacement in constraint.replace_scope:
-                aliases[replacement.source.lower()] = replacement.target.lower()
-    return set(scope_stack) | set(aliases.values())
+                source = replacement.source.lower()
+                target = replacement.target.lower()
+                aliases[source] = target
+                if source == "this" and "root" not in aliases:
+                    aliases["root"] = target
+    active_scopes = frozenset(scope for scope in aliases.values() if scope)
+    return ScopeContext(
+        active_scopes=active_scopes,
+        aliases=MappingProxyType(dict(aliases)),
+    )
+
+
+def _apply_push_scope(aliases: dict[str, str], scope: str) -> None:
+    for idx in range(len(_PREV_ALIAS_ORDER) - 1, 0, -1):
+        aliases[_PREV_ALIAS_ORDER[idx]] = aliases.get(_PREV_ALIAS_ORDER[idx - 1], "")
+    aliases["prev"] = aliases.get("this", "")
+    for idx in range(len(_SCOPE_ALIAS_ORDER) - 1, 0, -1):
+        aliases[_SCOPE_ALIAS_ORDER[idx]] = aliases.get(_SCOPE_ALIAS_ORDER[idx - 1], "")
+    aliases["this"] = scope
+    aliases.setdefault("root", scope)

@@ -157,7 +157,7 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase C extension (registry-backed `filepath`/`icon` checks via `AssetRegistry`) is now landed.
 - Immediate next step: complete stricter remaining primitive-family semantics (tighter variable/value references and unresolved-asset policy choices).
 - Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph and field-fact indexes, prioritizing `<spriteType>` membership checks for gameplay icons.
-- Update (current): initial scope-context transition checks are now landed in typecheck for nested field paths using `push_scope`/`replace_scope` metadata; remaining work is full scope-alias semantics (`this/root/from...`) and broader flow coverage.
+- Update (current): scope-context transition checks and scope-alias resolution (`this/root/from/fromfrom...` + `prev/prevprev...`) are landed in typecheck, including sibling-branch non-leakage and replace-scope alias-override test coverage; remaining work is deeper cross-object/ambiguous replacement hardening.
 - Technical-debt note (important): `project_root` service-binding for custom-injected typecheck rules (notably custom `value_set/value` constraints) is currently retained mainly for tests/compatibility and should be removed or narrowed once canonical rule-IR-based configuration is the only supported extension path.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering

@@ -10,6 +10,7 @@ from jominipy.lint.rules import (
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
 from jominipy.rules import RuleFieldConstraint, RuleValueSpec
+from jominipy.rules.ir import RuleScopeReplacement
 from jominipy.rules.semantics import RuleFieldScopeConstraint
 from jominipy.typecheck.assets import SetAssetRegistry
 from jominipy.typecheck.rules import (
@@ -486,6 +487,228 @@ def test_typecheck_scope_context_rule_reports_missing_scope_transition() -> None
     assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
         "TYPECHECK_INVALID_SCOPE_CONTEXT"
     ]
+
+
+def test_typecheck_scope_ref_resolves_this_alias_from_push_scope_context() -> None:
+    source = "technology={ who = this }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country",)),
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_resolves_from_alias_after_nested_push_scope() -> None:
+    source = "technology={ who = from }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country", "state")),
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_resolves_alias_from_replace_scope_mapping() -> None:
+    source = "technology={ who = from }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(
+                    replace_scope=(RuleScopeReplacement(source="from", target="country"),),
+                ),
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_resolves_prev_alias_after_push_scope() -> None:
+    source = "technology={ who = prev }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country", "state")),
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_resolves_prevprev_alias_after_three_pushes() -> None:
+    source = "technology={ who = prevprev }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state", "province"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country", "state", "province")),
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_resolves_prev_alias_from_replace_scope_mapping() -> None:
+    source = "technology={ who = prev }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(
+                    replace_scope=(RuleScopeReplacement(source="prev", target="country"),),
+                ),
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_does_not_leak_push_scope_from_sibling_branch() -> None:
+    source = "technology={ branch_b = this }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "branch_b": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                ("branch_a",): RuleFieldScopeConstraint(push_scope=("country",)),
+                ("branch_b",): RuleFieldScopeConstraint(required_scope=("country",)),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_scope_ref_applies_replace_scope_for_from_alias() -> None:
+    source = "technology={ wrapper={ who = from } }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                ("wrapper",): RuleFieldScopeConstraint(
+                    replace_scope=(RuleScopeReplacement(source="from", target="country"),),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_nested_replace_scope_overrides_chain_alias() -> None:
+    source = "technology={ wrapper={ who = from } }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country", "state")),
+                ("wrapper",): RuleFieldScopeConstraint(
+                    replace_scope=(RuleScopeReplacement(source="from", target="country"),),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
 
 
 def test_default_typecheck_rules_accept_injected_services_policy() -> None:

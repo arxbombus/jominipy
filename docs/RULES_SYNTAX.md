@@ -26,8 +26,10 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] `enum[...]` membership checks from cross-file HOI4 schema graph.
   - [x] `<type_key>` key existence checks from schema + generic injected type-membership sets (schema-driven `type[...]` discovery; `<spriteType>` is one instance, not a special case).
   - [x] Initial prefixed/suffixed `<type_key>` matching support (`prefix_<type>_suffix` forms).
-  - [x] Initial `scope[...]` reference-value checks against known scope aliases.
+  - [x] Scope reference checks now resolve alias-context (`this/root/from/fromfrom...` and `prev/prevprev...`) from `push_scope` + `replace_scope` transitions.
   - [x] Scope-context tracking checks for field declarations using `push_scope`/`replace_scope` transitions on nested field paths.
+  - [x] Added branch/isolation hardening tests to ensure sibling-path scope transitions do not leak across unrelated field branches.
+  - [x] Added replace-scope alias override tests for `from`/`prev` chain behavior.
   - [x] Initial dynamic `value_set[...]` capture + `value[...]` membership checks from parsed field facts (with `value_set[...]` treated as setter/register, not membership-check target).
   - [x] Project-root type-membership auto-wiring path for typecheck/check entrypoints.
 
@@ -42,7 +44,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 ### Not implemented yet (pending)
 - [ ] Strict handling for remaining primitive-family semantics (tighter variable/value reference semantics and project-policy decisions for unresolved asset lookups).
 - [ ] Full type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms) against project-discovered members.
-- [ ] Full scope-resolution checks (`scope[...]`, full stack/alias semantics for `this/root/from...` across complex nesting and cross-object flows).
+- [ ] Final scope-resolution hardening (`scope[...]` + alias chain) across deeper cross-object flows and ambiguous replacement edge cases.
 - [ ] Full value/value_set dynamic validation across files and execution scopes.
 - [ ] Alias/single-alias expansion and validation wiring.
 - [ ] Subtype resolution and subtype-conditional rule application.
