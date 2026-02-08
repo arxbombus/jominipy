@@ -2,6 +2,11 @@
 
 This roadmap is implementation-first and ordered to minimize rework.
 
+## How to read this roadmap
+- `Phase 0` + `Phase 1 Status` are the active rollout track for current implementation.
+- `Foundation Milestones A-F` are completed historical milestones that remain important reference material.
+- Use `docs/RULES_SYNTAX.md` checklist as the active execution order for CWTools rule semantics work.
+
 ## Current baseline (already landed)
 - Lexer/parser/CST pipeline is stable and Biome-style.
 - AST v1 exists (`jominipy/ast/model.py`, `jominipy/ast/scalar.py`, `jominipy/ast/lower.py`) and lowers from CST.
@@ -101,9 +106,15 @@ Status:
   - entrypoint orchestration update: `run_typecheck(...)` and `run_check(...)` compose typecheck + lint over one parse
   - validation coverage: `tests/test_lint_typecheck_engines.py`
 - Next:
-  - replace scaffold semantic/style/type rules with CWTools-derived rule IR consumers under enforced rule-domain contracts.
-  - consume newly landed read-only rules ingest (`jominipy/rules/*`) instead of ad hoc regex extraction.
-  - expand typed-rule enforcement from primitive scalar checks to enum/scope/type-reference validation.
+  - follow the checklist in `docs/RULES_SYNTAX.md` (`Implementation Checklist (jominipy status)`) as execution order.
+  - complete lower-complexity typed checks first:
+    - primitive range enforcement (`int[...]`, `float[...]`)
+    - additional simple primitive families (`date_field`, `percentage_field`, etc.)
+  - then add resolved-reference checks over indexed schema data:
+    - enum membership (`enum[...]`)
+    - type references (`<type_key>` and related forms)
+    - scope-reference validation (`scope[...]`, `push_scope`, `replace_scope`)
+  - keep correctness checks migrating toward typecheck ownership; keep lint focused on policy/style/heuristics.
 
 ## Phase 1 Boundary Contracts (completed)
 - checker rule contracts are enforced mechanically:
@@ -116,7 +127,7 @@ Status:
   - code prefix must be `LINT_`
 - runners validate contracts before rule execution.
 
-## Phase 1: AST block/list coercion and repeated-key policy (completed)
+## Foundation Milestone A (completed): AST block/list coercion and repeated-key policy
 Goal: make AST ergonomic for Jomini data access while preserving CST truth.
 
 Deliverables:
@@ -151,7 +162,7 @@ Status:
 - Added AST tests for shape/coercion/repeated-key behavior in `tests/test_ast.py`.
 - Canonical AST remains order-preserving and unchanged; coercion remains derived-view only.
 
-## Phase 2: Scalar interpretation policy hardening (completed)
+## Foundation Milestone B (completed): Scalar interpretation policy hardening
 Goal: keep semantics explicit and non-destructive.
 
 Deliverables:
@@ -177,7 +188,7 @@ Status:
   - quoted default vs opt-in coercion coverage
   - large integer and sign handling coverage
 
-## Phase 3: Red CST wrappers (Biome parity priority) (completed)
+## Foundation Milestone C (completed): Red CST wrappers (Biome parity priority)
 Goal: stop doing manual green-tree walking in high-level code.
 
 Deliverables:
@@ -202,7 +213,7 @@ Status:
   - `parse_to_ast(...)` and `lower_tree(...)` now lower through red wrappers
 - Added red-wrapper tests in `tests/test_cst_red.py`.
 
-## Phase 4: Recovery/diagnostic hardening (completed)
+## Foundation Milestone D (completed): Recovery/diagnostic hardening
 Goal: robust parse under malformed real-world input.
 
 Deliverables:
@@ -223,7 +234,7 @@ Status:
 - Biome parity alignment:
   - parser diagnostic de-duplication at same position now matches Biome behavior.
 
-## AST Consumer Follow-on (after Phase 4) (completed)
+## Foundation Milestone E (completed): AST consumer follow-on
 Goal: actively consume Phase 1 model aliases in downstream AST APIs.
 
 Deliverables:
@@ -269,7 +280,7 @@ Status:
 - Kept `tests/test_ast.py` focused on core lowering/model semantics and moved consumer view assertions into `tests/test_ast_views.py`.
 - Updated docs (`ARCHITECTURE`, `BIOME_PARITY`, `HANDOFF`) to reflect parity and execution state.
 
-## Phase 5: Docs and parity governance
+## Foundation Milestone F (ongoing): docs and parity governance
 Goal: keep architecture and parity docs accurate after each phase.
 
 Deliverables each phase:

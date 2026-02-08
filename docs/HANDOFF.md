@@ -29,7 +29,19 @@ Every agent must perform this checklist before finishing a substantive task:
 5. Validation evidence must be recorded in handoff doc/memory:
    - exact commands and pass/fail results.
 
-## Current State (as of 2026-02-07)
+## Quick Read (Operational)
+- Active workstream: CWTools rules ingest -> normalized IR -> typed semantic enforcement.
+- Current sequencing source of truth: `docs/RULES_SYNTAX.md` -> `Implementation Checklist (jominipy status)`.
+- Immediate implementation order:
+  1. primitive/range checks (`int[...]`, `float[...]`, and simple primitive families)
+  2. resolved reference checks (`enum[...]`, `<type_key>`, `scope[...]`)
+  3. move hard correctness checks to typecheck ownership
+- Core invariants remain required:
+  - one parse/facts lifecycle (`JominiParseResult`)
+  - lint/typecheck boundary contracts
+  - Biome parity tracking in `docs/BIOME_PARITY.md`
+
+## Historical Landed State (through 2026-02-07)
 - Parser/CST pipeline is stable and unchanged during AST phases.
 - AST phases 1-5 are complete:
   - block/list coercion utilities
@@ -106,9 +118,12 @@ Every agent must perform this checklist before finishing a substantive task:
   - tests added/updated:
     - `tests/test_rules_ingest.py` field-constraint extraction test
     - `tests/test_lint_typecheck_engines.py` custom-schema type mismatch test
-- Implementation status adjustment:
-  - implementation work is now paused
-  - current focus is completing the full Phase 0 proposal and gating criteria across docs/memories
+- CWTools syntax coverage checklist is now documented in `docs/RULES_SYNTAX.md` under `Implementation Checklist (jominipy status)`:
+  - implemented: IR ingest/indexing + metadata normalization + required-field extraction + initial primitive checks
+  - pending: primitive range enforcement, enum/type/scope resolution, value-set and alias wiring, subtype and special-file semantics, and typecheck ownership migration for correctness checks
+- Historical note:
+  - this pause state applied during earlier planning-gate work
+  - current execution has resumed under the checklist-driven sequencing in `docs/RULES_SYNTAX.md`
 - Validation snapshot after carrier work:
   - `uv run pytest -q tests/test_parse_result.py tests/test_parser.py tests/test_ast.py tests/test_ast_views.py` (`217 passed`)
   - `uv run pytest -q tests/test_lexer.py tests/test_cst_red.py tests/test_parse_result.py tests/test_parser.py tests/test_ast.py tests/test_ast_views.py` (`286 passed`)
@@ -133,7 +148,7 @@ Every agent must perform this checklist before finishing a substantive task:
   - compact value renderers
   - source printed once per central-case run with path-labeled block dumps
 
-## Next Task (post-Phase-0 kickoff)
+## Current Next Task
 - Phase 0 planning gate is complete.
 - Immediate next step: start Phase 1 execution (lint engine core) under the approved proposal constraints.
 - Immediate next step: replace scaffold rules with CWTools-derived rule IR consumers under the enforced lint/checker contracts.
