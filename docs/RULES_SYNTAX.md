@@ -16,6 +16,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [x] Extract required fields from cardinality metadata.
 - [x] Extract per-field RHS value specs (primitive, enum ref, scope ref, type ref, value refs, block/tagged forms).
 - [x] Cross-file HOI4 schema graph/index foundation over `references/hoi4-rules/Config` (types/enums/aliases/sections/value families + top-level rule objects).
+- [x] Shared nested analysis facts for object fields (path + occurrence indexes) to support field-level checker/linter validation without ad hoc AST walks.
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
   - [x] Primitive scalar type checks for `int`/`float`/`bool`.

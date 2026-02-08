@@ -60,6 +60,7 @@ For every parser/CST/AST feature, record:
   - code generation and engine consumption remain `pending`.
   - approved next parity step (2026-02-08): cross-file schema graph -> nested facts -> typecheck correctness expansion -> resolved reference checks -> advanced semantics wiring.
   - update (2026-02-08): cross-file schema graph foundation is implemented and consumed by HOI4 semantic loaders.
+  - update (2026-02-08): nested analysis facts for object fields are implemented in shared facts cache (`jominipy/analysis/facts.py`) for deterministic field-level rule execution.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

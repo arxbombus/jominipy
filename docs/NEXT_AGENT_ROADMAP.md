@@ -138,7 +138,8 @@ Execution phases (ordered):
 
 Phase 1.1 progress:
 - Completed: Phase A schema graph foundation (`jominipy/rules/schema_graph.py`) and semantic-loader wiring to cross-file HOI4 config graph.
-- Next: Phase B nested analysis facts, then Phase C primitive/range correctness in typecheck.
+- Completed: Phase B nested analysis facts (`jominipy/analysis/facts.py`) with deterministic object/field path + occurrence indexing.
+- Next: Phase C primitive/range correctness in typecheck, then resolved-reference correctness checks.
 
 Boundary constraints (must remain true):
 - `typecheck` owns correctness diagnostics (`TYPECHECK_*`, `domain=correctness`, `confidence=sound`).

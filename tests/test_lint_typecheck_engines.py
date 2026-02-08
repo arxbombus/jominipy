@@ -137,3 +137,31 @@ def test_lint_cwtools_type_rule_with_custom_schema() -> None:
 
     assert codes == ["LINT_SEMANTIC_INVALID_FIELD_TYPE"]
     assert "technology.level" in lint_result.diagnostics[0].message
+
+
+def test_analysis_facts_include_nested_object_fields_with_occurrence_tracking() -> None:
+    parsed = parse_result("technology={ level=1 level=2 cost=3 }\ntechnology={ level=4 }\n")
+    facts = parsed.analysis_facts()
+
+    assert "technology" in facts.object_fields
+    field_facts = facts.object_fields["technology"]
+    assert [(fact.path, fact.object_occurrence, fact.field_occurrence) for fact in field_facts] == [
+        (("technology", "level"), 0, 0),
+        (("technology", "level"), 0, 1),
+        (("technology", "cost"), 0, 0),
+        (("technology", "level"), 1, 0),
+    ]
+
+    by_field = facts.object_field_map["technology"]
+    assert len(by_field["level"]) == 3
+    assert len(by_field["cost"]) == 1
+    assert len(facts.all_field_facts) == 4
+
+
+def test_analysis_facts_skip_non_object_like_blocks_for_nested_field_index() -> None:
+    parsed = parse_result("technology={ a=1 2 }\n")
+    facts = parsed.analysis_facts()
+
+    assert "technology" not in facts.object_fields
+    assert "technology" not in facts.object_field_map
+    assert facts.all_field_facts == ()
