@@ -14,6 +14,7 @@ from jominipy.typecheck.services import (
     UnresolvedPolicy,
     build_typecheck_services_from_file_texts,
     build_typecheck_services_from_project_root,
+    build_value_memberships_from_file_texts,
 )
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     "UnresolvedPolicy",
     "build_typecheck_services_from_file_texts",
     "build_typecheck_services_from_project_root",
+    "build_value_memberships_from_file_texts",
     "run_typecheck",
 ]

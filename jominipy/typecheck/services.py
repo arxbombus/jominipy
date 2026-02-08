@@ -44,6 +44,8 @@ def build_typecheck_services_from_file_texts(
     from jominipy.rules import (
         build_type_memberships_from_file_texts,
         extract_type_definitions,
+        load_hoi4_field_constraints,
+        load_hoi4_known_scopes,
         load_hoi4_schema_graph,
     )
 
@@ -53,10 +55,17 @@ def build_typecheck_services_from_file_texts(
         file_texts_by_path=file_texts_by_path,
         type_definitions_by_key=type_definitions,
     )
+    field_constraints = load_hoi4_field_constraints(include_implicit_required=False)
+    value_memberships = build_value_memberships_from_file_texts(
+        file_texts_by_path=file_texts_by_path,
+        field_constraints_by_object=field_constraints,
+    )
     return TypecheckServices(
         asset_registry=asset_registry or NullAssetRegistry(),
         policy=policy or TypecheckPolicy(),
         type_memberships_by_key=MappingProxyType(memberships),
+        value_memberships_by_key=MappingProxyType(value_memberships),
+        known_scopes=load_hoi4_known_scopes(),
     )
 
 
@@ -75,3 +84,39 @@ def build_typecheck_services_from_project_root(
         asset_registry=asset_registry,
         policy=policy,
     )
+
+
+def build_value_memberships_from_file_texts(
+    *,
+    file_texts_by_path: Mapping[str, str],
+    field_constraints_by_object: Mapping[str, Mapping[str, object]],
+) -> dict[str, frozenset[str]]:
+    from jominipy.ast import AstScalar
+    from jominipy.parser import parse_result
+
+    memberships: dict[str, set[str]] = {}
+    for text in file_texts_by_path.values():
+        parsed = parse_result(text)
+        facts = parsed.analysis_facts()
+        for object_key, field_constraints in field_constraints_by_object.items():
+            field_map = facts.object_field_map.get(object_key)
+            if not field_map:
+                continue
+            for field_name, constraint in field_constraints.items():
+                specs = getattr(constraint, "value_specs", ())
+                keys = {
+                    (spec.argument or "").strip()
+                    for spec in specs
+                    if getattr(spec, "kind", None) == "value_set_ref" and (spec.argument or "").strip()
+                }
+                if not keys:
+                    continue
+                for field_fact in field_map.get(field_name, ()):
+                    if not isinstance(field_fact.value, AstScalar):
+                        continue
+                    raw = field_fact.value.raw_text.strip().strip('"')
+                    if not raw:
+                        continue
+                    for key in keys:
+                        memberships.setdefault(key, set()).add(raw)
+    return {key: frozenset(values) for key, values in memberships.items()}

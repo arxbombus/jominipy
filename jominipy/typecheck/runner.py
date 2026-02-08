@@ -18,6 +18,7 @@ from jominipy.typecheck.rules import (
 from jominipy.typecheck.services import (
     TypecheckServices,
     build_typecheck_services_from_project_root,
+    build_value_memberships_from_file_texts,
 )
 
 
@@ -47,8 +48,17 @@ def run_typecheck(
         if rules is not None
         else default_typecheck_rules(services=resolved_services)
     )
+    project_file_texts: dict[str, str] | None = None
     if rules is not None and (services is not None or project_root is not None):
-        resolved_rules = _bind_services_to_rules(resolved_rules, services=resolved_services)
+        if project_root is not None:
+            from jominipy.rules import collect_file_texts_under_root
+
+            project_file_texts = collect_file_texts_under_root(project_root)
+        resolved_rules = _bind_services_to_rules(
+            resolved_rules,
+            services=resolved_services,
+            project_file_texts=project_file_texts,
+        )
     validate_typecheck_rules(resolved_rules)
 
     diagnostics = list(resolved_parse.diagnostics)
@@ -92,6 +102,7 @@ def _bind_services_to_rules(
     rules: tuple[TypecheckRule, ...],
     *,
     services: TypecheckServices,
+    project_file_texts: dict[str, str] | None = None,
 ) -> tuple[TypecheckRule, ...]:
     bound: list[TypecheckRule] = []
     for rule in rules:
@@ -106,7 +117,21 @@ def _bind_services_to_rules(
         if hasattr(rule, "type_memberships_by_key") and not getattr(rule, "type_memberships_by_key"):
             replacements["type_memberships_by_key"] = services.type_memberships_by_key
         if hasattr(rule, "value_memberships_by_key") and not getattr(rule, "value_memberships_by_key"):
-            replacements["value_memberships_by_key"] = services.value_memberships_by_key
+            value_memberships = services.value_memberships_by_key
+            field_constraints = getattr(rule, "field_constraints_by_object", None)
+            if project_file_texts and field_constraints:
+                extra_memberships = build_value_memberships_from_file_texts(
+                    file_texts_by_path=project_file_texts,
+                    field_constraints_by_object=field_constraints,
+                )
+                merged = dict(value_memberships)
+                for key, values in extra_memberships.items():
+                    existing = set(merged.get(key, frozenset()))
+                    existing.update(values)
+                    merged[key] = frozenset(existing)
+                replacements["value_memberships_by_key"] = merged
+            else:
+                replacements["value_memberships_by_key"] = value_memberships
         if hasattr(rule, "known_scopes") and not getattr(rule, "known_scopes"):
             replacements["known_scopes"] = services.known_scopes
         if replacements:

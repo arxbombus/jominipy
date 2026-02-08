@@ -157,6 +157,7 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase C extension (registry-backed `filepath`/`icon` checks via `AssetRegistry`) is now landed.
 - Immediate next step: complete stricter remaining primitive-family semantics (tighter variable/value references and unresolved-asset policy choices).
 - Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph and field-fact indexes, prioritizing `<spriteType>` membership checks for gameplay icons.
+- Technical-debt note (important): `project_root` service-binding for custom-injected typecheck rules (notably custom `value_set/value` constraints) is currently retained mainly for tests/compatibility and should be removed or narrowed once canonical rule-IR-based configuration is the only supported extension path.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule from CWTools-derived constraints (required fields/cardinality)

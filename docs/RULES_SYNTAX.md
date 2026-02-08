@@ -29,6 +29,11 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] Initial `scope[...]` reference-value checks against known scope aliases.
   - [x] Initial dynamic `value_set[...]` capture + `value[...]` membership checks from parsed field facts.
   - [x] Project-root type-membership auto-wiring path for typecheck/check entrypoints.
+
+### Temporary compatibility note
+- Current `project_root` auto-binding for custom-injected typecheck rules (especially custom `value_set/value` constraints) exists primarily to keep test coverage and local experimentation stable.
+- Expected long-term direction: project-root resolution should be owned by jominipy's canonical rule pipeline/IR, not arbitrary custom-injected CWTools-like constraints at runtime.
+- This path should be considered a cleanup/removal candidate once the canonical rule-format pipeline fully replaces ad hoc custom-rule injection.
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
   - [x] Primitive scalar type checks for `int`/`float`/`bool` (historical; now owned by typecheck for correctness).

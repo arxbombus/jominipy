@@ -99,3 +99,30 @@ def test_run_check_accepts_typecheck_services_parameters(tmp_path: Path) -> None
     result = run_check(source, project_root=str(tmp_path))
 
     assert result.parse.source_text == source
+
+
+def test_run_typecheck_project_root_populates_value_memberships_across_files(tmp_path: Path) -> None:
+    values_dir = tmp_path / "game" / "common" / "test_values"
+    values_dir.mkdir(parents=True, exist_ok=True)
+    (values_dir / "a.txt").write_text("technology={ set_key = alpha }\n", encoding="utf-8")
+    (values_dir / "b.txt").write_text("technology={ has_key = beta }\n", encoding="utf-8")
+    source = "technology={ has_key = gamma }\n"
+    rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "set_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="value_set_ref", raw="value_set[test_key]", argument="test_key"),),
+                ),
+                "has_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="value_ref", raw="value[test_key]", argument="test_key"),),
+                ),
+            }
+        },
+        known_type_keys=frozenset(),
+    )
+
+    result = run_typecheck(source, rules=(rule,), project_root=str(tmp_path))
+
+    assert [diagnostic.code for diagnostic in result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
