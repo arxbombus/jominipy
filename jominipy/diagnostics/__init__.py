@@ -18,6 +18,7 @@ from jominipy.diagnostics.codes import (
     TYPECHECK_INVALID_FIELD_REFERENCE,
     TYPECHECK_INVALID_FIELD_TYPE,
     TYPECHECK_INVALID_SCOPE_CONTEXT,
+    TYPECHECK_RULE_CUSTOM_ERROR,
     DiagnosticSpec,
 )
 from jominipy.diagnostics.diagnostic import Diagnostic, Severity
@@ -41,6 +42,7 @@ __all__ = [
     "TYPECHECK_INVALID_FIELD_REFERENCE",
     "TYPECHECK_INVALID_FIELD_TYPE",
     "TYPECHECK_INVALID_SCOPE_CONTEXT",
+    "TYPECHECK_RULE_CUSTOM_ERROR",
     "Diagnostic",
     "DiagnosticSpec",
     "Severity",

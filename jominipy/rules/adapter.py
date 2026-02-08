@@ -126,6 +126,10 @@ def build_expanded_field_constraints(
             expanded_fields[field_name] = RuleFieldConstraint(
                 required=constraint.required,
                 value_specs=expanded_specs,
+                comparison=constraint.comparison,
+                error_if_only_match=constraint.error_if_only_match,
+                outgoing_reference_label=constraint.outgoing_reference_label,
+                incoming_reference_label=constraint.incoming_reference_label,
             )
         expanded[object_key] = expanded_fields
     return ExpandedFieldConstraints(by_object=expanded)
@@ -647,11 +651,22 @@ def _build_constraints_from_rule_block(
         )
         existing = by_field.get(child.key)
         if existing is None:
-            by_field[child.key] = RuleFieldConstraint(required=required, value_specs=specs)
+            by_field[child.key] = RuleFieldConstraint(
+                required=required,
+                value_specs=specs,
+                comparison=child.metadata.comparison,
+                error_if_only_match=child.metadata.error_if_only_match,
+                outgoing_reference_label=child.metadata.outgoing_reference_label,
+                incoming_reference_label=child.metadata.incoming_reference_label,
+            )
             continue
         by_field[child.key] = RuleFieldConstraint(
             required=existing.required or required,
             value_specs=_merge_specs(existing.value_specs, specs),
+            comparison=existing.comparison or child.metadata.comparison,
+            error_if_only_match=existing.error_if_only_match or child.metadata.error_if_only_match,
+            outgoing_reference_label=existing.outgoing_reference_label or child.metadata.outgoing_reference_label,
+            incoming_reference_label=existing.incoming_reference_label or child.metadata.incoming_reference_label,
         )
     return by_field
 

@@ -107,6 +107,13 @@ TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT: Final[DiagnosticSpec] = DiagnosticSpec(
     category="typecheck",
 )
 
+TYPECHECK_RULE_CUSTOM_ERROR: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="TYPECHECK_RULE_CUSTOM_ERROR",
+    message="Field matched a CWTools custom error rule.",
+    severity="warning",
+    category="typecheck",
+)
+
 LINT_SEMANTIC_INCONSISTENT_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
     code="LINT_SEMANTIC_INCONSISTENT_SHAPE",
     message="Semantic rule: mixed value shapes should be normalized.",

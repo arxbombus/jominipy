@@ -27,6 +27,8 @@ _CATEGORY_BY_FAMILY = {
     "value": "value",
 }
 
+_OPTION_KEY_NORMALIZER = re.compile(r"[^a-z0-9]+")
+
 _SECTION_KEYS = {
     "types",
     "enums",
@@ -80,6 +82,21 @@ def _normalize_file(file: RuleFileIR) -> RuleFileIR:
 
 def _normalize_statement(statement: RuleStatement) -> RuleStatement:
     normalized_metadata = _normalize_metadata(statement.metadata)
+    if statement.operator == "==":
+        normalized_metadata = RuleMetadata(
+            documentation=normalized_metadata.documentation,
+            options=normalized_metadata.options,
+            cardinality=normalized_metadata.cardinality,
+            scope=normalized_metadata.scope,
+            push_scope=normalized_metadata.push_scope,
+            replace_scope=normalized_metadata.replace_scope,
+            severity=normalized_metadata.severity,
+            comparison=True,
+            error_if_only_match=normalized_metadata.error_if_only_match,
+            outgoing_reference_label=normalized_metadata.outgoing_reference_label,
+            incoming_reference_label=normalized_metadata.incoming_reference_label,
+            flags=normalized_metadata.flags,
+        )
     if statement.value.kind not in {"block", "tagged_block"}:
         return RuleStatement(
             source_path=statement.source_path,
@@ -115,12 +132,16 @@ def _normalize_metadata(metadata: RuleMetadata) -> RuleMetadata:
     push_scope: tuple[str, ...] | None = None
     replace_scope: tuple[RuleScopeReplacement, ...] | None = None
     severity: str | None = None
+    error_if_only_match: str | None = None
+    outgoing_reference_label: str | None = None
+    incoming_reference_label: str | None = None
     flags: set[str] = set(metadata.flags)
 
     for option in metadata.options:
         key = option.key.strip()
         value = option.value.strip() if option.value is not None else None
         key_lower = key.lower()
+        normalized_key = _normalize_option_key(key)
         if value is None:
             flags.add(key)
             continue
@@ -142,6 +163,15 @@ def _normalize_metadata(metadata: RuleMetadata) -> RuleMetadata:
             continue
         if key_lower == "severity":
             severity = value
+            continue
+        if normalized_key == "errorifonlymatch":
+            error_if_only_match = value
+            continue
+        if normalized_key == "outgoingreferencelabel":
+            outgoing_reference_label = value
+            continue
+        if normalized_key == "incomingreferencelabel":
+            incoming_reference_label = value
 
     return RuleMetadata(
         documentation=metadata.documentation,
@@ -151,8 +181,16 @@ def _normalize_metadata(metadata: RuleMetadata) -> RuleMetadata:
         push_scope=push_scope,
         replace_scope=replace_scope,
         severity=severity,
+        comparison=metadata.comparison,
+        error_if_only_match=error_if_only_match,
+        outgoing_reference_label=outgoing_reference_label,
+        incoming_reference_label=incoming_reference_label,
         flags=frozenset(flags),
     )
+
+
+def _normalize_option_key(key: str) -> str:
+    return _OPTION_KEY_NORMALIZER.sub("", key.strip().lower())
 
 
 def _parse_cardinality(value: str) -> RuleCardinality | None:

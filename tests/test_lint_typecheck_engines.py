@@ -20,6 +20,7 @@ from jominipy.rules.ir import RuleScopeReplacement
 from jominipy.rules.semantics import RuleFieldScopeConstraint
 from jominipy.typecheck.assets import SetAssetRegistry
 from jominipy.typecheck.rules import (
+    ErrorIfOnlyMatchRule,
     FieldConstraintRule,
     FieldReferenceConstraintRule,
     FieldScopeContextRule,
@@ -752,6 +753,49 @@ def test_typecheck_localisation_command_scope_unresolved_command_defer_policy() 
         localisation_command_definitions_by_name={},
         field_scope_constraints_by_object={"technology": {(): RuleFieldScopeConstraint(push_scope=("country",))}},
         policy=TypecheckPolicy(unresolved_reference="defer"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_error_if_only_match_emits_custom_diagnostic_when_value_matches() -> None:
+    source = "technology={ target = var:foo }\n"
+    custom_rule = ErrorIfOnlyMatchRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="primitive", raw="scalar", primitive="scalar"),),
+                    error_if_only_match="custom-scope-match-error",
+                    comparison=True,
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_RULE_CUSTOM_ERROR"
+    ]
+    assert "custom-scope-match-error" in typecheck_result.diagnostics[0].message
+
+
+def test_typecheck_error_if_only_match_skips_when_value_does_not_match() -> None:
+    source = "technology={ target = var:foo }\n"
+    custom_rule = ErrorIfOnlyMatchRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int"),),
+                    error_if_only_match="custom-scope-match-error",
+                    comparison=True,
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
     )
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))

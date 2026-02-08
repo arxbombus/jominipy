@@ -98,6 +98,9 @@ def test_rules_normalization_parses_typed_metadata_options() -> None:
 ## severity = warning
 ## required
 allow = {
+    ## error_if_only_match = disallowed in this context
+    ## outgoingReferenceLabel = outbound-tech
+    comparison_field == int
     value = int
 }
 """
@@ -124,6 +127,14 @@ allow = {
     )
     assert metadata.severity == "warning"
     assert "required" in metadata.flags
+
+    comparison_entries = [item for item in ruleset.indexed if item.key == "comparison_field"]
+    assert len(comparison_entries) == 1
+    comparison_metadata = comparison_entries[0].statement.metadata
+    assert comparison_metadata.comparison is True
+    assert comparison_metadata.error_if_only_match == "disallowed in this context"
+    assert comparison_metadata.outgoing_reference_label == "outbound-tech"
+    assert comparison_metadata.incoming_reference_label is None
 
 
 def test_rules_indexing_disambiguates_repeated_keys_with_declaration_paths() -> None:
@@ -171,7 +182,9 @@ def test_field_constraint_extraction_from_scalar_specs() -> None:
     ## cardinality = 1..1
     required_field = int
     optional_float = float[0..1]
-    scoped = scope[country]
+    ## error_if_only_match = do not use this exact scope
+    ## incomingReferenceLabel = inbound-country
+    scoped == scope[country]
     complex = { child = int }
 }
 """
@@ -198,6 +211,9 @@ def test_field_constraint_extraction_from_scalar_specs() -> None:
                 value_specs=(
                     RuleValueSpec(kind="scope_ref", raw="scope[country]", primitive=None, argument="country"),
                 ),
+                comparison=True,
+                error_if_only_match="do not use this exact scope",
+                incoming_reference_label="inbound-country",
             ),
             "complex": RuleFieldConstraint(
                 required=False,

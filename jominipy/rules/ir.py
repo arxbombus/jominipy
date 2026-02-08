@@ -53,6 +53,10 @@ class RuleMetadata:
     push_scope: tuple[str, ...] | None = None
     replace_scope: tuple[RuleScopeReplacement, ...] | None = None
     severity: str | None = None
+    comparison: bool = False
+    error_if_only_match: str | None = None
+    outgoing_reference_label: str | None = None
+    incoming_reference_label: str | None = None
     flags: frozenset[str] = frozenset()
 
 

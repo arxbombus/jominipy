@@ -48,6 +48,10 @@ class RuleValueSpec:
 class RuleFieldConstraint:
     required: bool
     value_specs: tuple[RuleValueSpec, ...]
+    comparison: bool = False
+    error_if_only_match: str | None = None
+    outgoing_reference_label: str | None = None
+    incoming_reference_label: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,12 +119,27 @@ def build_field_constraints_by_object(
             specs = extract_value_specs(child.value)
             existing = constraints.get(child.key)
             if existing is None:
-                constraints[child.key] = RuleFieldConstraint(required=required, value_specs=specs)
+                constraints[child.key] = RuleFieldConstraint(
+                    required=required,
+                    value_specs=specs,
+                    comparison=child.metadata.comparison,
+                    error_if_only_match=child.metadata.error_if_only_match,
+                    outgoing_reference_label=child.metadata.outgoing_reference_label,
+                    incoming_reference_label=child.metadata.incoming_reference_label,
+                )
                 continue
             merged_specs = _merge_value_specs(existing.value_specs, specs)
             constraints[child.key] = RuleFieldConstraint(
                 required=existing.required or required,
                 value_specs=merged_specs,
+                comparison=existing.comparison or child.metadata.comparison,
+                error_if_only_match=existing.error_if_only_match or child.metadata.error_if_only_match,
+                outgoing_reference_label=(
+                    existing.outgoing_reference_label or child.metadata.outgoing_reference_label
+                ),
+                incoming_reference_label=(
+                    existing.incoming_reference_label or child.metadata.incoming_reference_label
+                ),
             )
 
         if constraints:

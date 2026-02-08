@@ -20,6 +20,7 @@ from jominipy.diagnostics import (
     TYPECHECK_INVALID_FIELD_REFERENCE,
     TYPECHECK_INVALID_FIELD_TYPE,
     TYPECHECK_INVALID_SCOPE_CONTEXT,
+    TYPECHECK_RULE_CUSTOM_ERROR,
     Diagnostic,
 )
 from jominipy.rules.adapter import LinkDefinition, SubtypeMatcher
@@ -532,6 +533,118 @@ class LocalisationCommandScopeRule:
         return diagnostics
 
 
+@dataclass(frozen=True, slots=True)
+class ErrorIfOnlyMatchRule:
+    """Emits custom diagnostics when `error_if_only_match` constraints match."""
+
+    code: str = TYPECHECK_RULE_CUSTOM_ERROR.code
+    name: str = "errorIfOnlyMatch"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
+    enum_values_by_key: Mapping[str, frozenset[str]] | None = None
+    known_type_keys: frozenset[str] | None = None
+    type_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
+    value_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
+    known_scopes: frozenset[str] = frozenset()
+    alias_memberships_by_family: Mapping[str, frozenset[str]] = MappingProxyType({})
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
+        MappingProxyType({})
+    )
+    link_definitions_by_name: Mapping[str, LinkDefinition] = MappingProxyType({})
+    field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
+    asset_registry: AssetRegistry = NullAssetRegistry()
+    policy: TypecheckPolicy = TypecheckPolicy()
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        constraints = self.field_constraints_by_object
+        if constraints is None:
+            constraints = load_hoi4_field_constraints(include_implicit_required=False)
+        enum_values = self.enum_values_by_key or load_hoi4_enum_values()
+        if self.enum_values_by_key is not None:
+            enum_values = _merge_membership_maps(load_hoi4_enum_values(), self.enum_values_by_key)
+        known_type_keys = self.known_type_keys or load_hoi4_type_keys()
+        known_scopes = self.known_scopes or load_hoi4_known_scopes()
+        scope_constraints = self.field_scope_constraints_by_object
+        if scope_constraints is None:
+            scope_constraints = load_hoi4_field_scope_constraints()
+        dynamic_values = _build_dynamic_value_memberships(facts=facts, constraints=constraints)
+        merged_value_memberships = _merge_membership_maps(self.value_memberships_by_key, dynamic_values)
+
+        diagnostics: list[Diagnostic] = []
+        for object_key, field_constraints in constraints.items():
+            field_map = facts.object_field_map.get(object_key)
+            if not field_map:
+                continue
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            subtype_constraints = self.subtype_field_constraints_by_object.get(object_key, {})
+            field_names = set(field_constraints.keys())
+            for by_field in subtype_constraints.values():
+                field_names.update(by_field.keys())
+            for field_name in sorted(field_names):
+                field_facts = field_map.get(field_name)
+                if not field_facts:
+                    continue
+                for field_fact in field_facts:
+                    constraint = _resolve_effective_field_constraint(
+                        object_key=object_key,
+                        object_occurrence=field_fact.object_occurrence,
+                        field_name=field_name,
+                        base_constraints=field_constraints,
+                        subtype_matchers=subtype_matchers,
+                        subtype_constraints=subtype_constraints,
+                        facts=facts,
+                    )
+                    if constraint is None or not constraint.error_if_only_match:
+                        continue
+                    reference_specs = tuple(
+                        spec for spec in constraint.value_specs if spec.kind in _REFERENCE_SPEC_KINDS
+                    )
+                    non_reference_specs = tuple(
+                        spec for spec in constraint.value_specs if spec.kind not in _REFERENCE_SPEC_KINDS
+                    )
+                    relative_path = field_fact.path[1:]
+                    scope_context = _resolve_scope_context_before_path(
+                        relative_path=relative_path,
+                        by_path=scope_constraints.get(object_key, {}),
+                    )
+                    if scope_context.ambiguity is not None:
+                        continue
+                    matches_non_reference = bool(non_reference_specs) and _matches_value_specs(
+                        field_fact.value,
+                        non_reference_specs,
+                        asset_registry=self.asset_registry,
+                        policy=self.policy,
+                    )
+                    matches_reference = bool(reference_specs) and _matches_reference_specs(
+                        field_fact.value,
+                        reference_specs,
+                        enum_values_by_key=enum_values,
+                        known_type_keys=known_type_keys,
+                        type_memberships_by_key=self.type_memberships_by_key,
+                        value_memberships_by_key=merged_value_memberships,
+                        known_scopes=known_scopes,
+                        alias_memberships_by_family=self.alias_memberships_by_family,
+                        link_definitions_by_name=self.link_definitions_by_name,
+                        scope_context=scope_context,
+                        policy=self.policy,
+                    )
+                    if not (matches_non_reference or matches_reference):
+                        continue
+                    diagnostics.append(
+                        Diagnostic(
+                            code=self.code,
+                            message=f"{TYPECHECK_RULE_CUSTOM_ERROR.message} {constraint.error_if_only_match}",
+                            range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                            severity=TYPECHECK_RULE_CUSTOM_ERROR.severity,
+                            hint="Adjust the value or remove the matching custom-error rule condition.",
+                            category=TYPECHECK_RULE_CUSTOM_ERROR.category,
+                        )
+                    )
+        return diagnostics
+
+
 def build_typecheck_facts(facts: AnalysisFacts) -> TypecheckFacts:
     inconsistent: dict[str, tuple[str, ...]] = {}
     for key, shapes in facts.top_level_shapes.items():
@@ -559,6 +672,18 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             link_definitions_by_name=resolved_services.link_definitions_by_name,
+            policy=resolved_services.policy,
+        ),
+        ErrorIfOnlyMatchRule(
+            enum_values_by_key=resolved_services.enum_memberships_by_key,
+            type_memberships_by_key=resolved_services.type_memberships_by_key,
+            value_memberships_by_key=resolved_services.value_memberships_by_key,
+            known_scopes=resolved_services.known_scopes,
+            alias_memberships_by_family=resolved_services.alias_memberships_by_family,
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+            subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
+            link_definitions_by_name=resolved_services.link_definitions_by_name,
+            asset_registry=resolved_services.asset_registry,
             policy=resolved_services.policy,
         ),
         LocalisationCommandScopeRule(
@@ -639,6 +764,10 @@ def _resolve_effective_field_constraint(
         merged = RuleFieldConstraint(
             required=merged.required or subtype_constraint.required,
             value_specs=_merge_value_specs(merged.value_specs, subtype_constraint.value_specs),
+            comparison=merged.comparison or subtype_constraint.comparison,
+            error_if_only_match=merged.error_if_only_match or subtype_constraint.error_if_only_match,
+            outgoing_reference_label=merged.outgoing_reference_label or subtype_constraint.outgoing_reference_label,
+            incoming_reference_label=merged.incoming_reference_label or subtype_constraint.incoming_reference_label,
         )
     return merged
 
