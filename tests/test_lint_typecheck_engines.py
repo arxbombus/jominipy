@@ -711,6 +711,79 @@ def test_typecheck_scope_ref_nested_replace_scope_overrides_chain_alias() -> Non
     assert typecheck_result.diagnostics == []
 
 
+def test_typecheck_scope_ref_reports_ambiguous_replace_scope_alias_mapping() -> None:
+    source = "technology={ who = from }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(
+                    replace_scope=(
+                        RuleScopeReplacement(source="from", target="country"),
+                        RuleScopeReplacement(source="from", target="state"),
+                    ),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT"
+    ]
+
+
+def test_typecheck_scope_context_reports_ambiguous_replace_scope_alias_mapping() -> None:
+    source = "technology={ who = TAG }\n"
+    custom_rule = FieldScopeContextRule(
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(
+                    replace_scope=(
+                        RuleScopeReplacement(source="from", target="country"),
+                        RuleScopeReplacement(source="from", target="state"),
+                    ),
+                ),
+                ("who",): RuleFieldScopeConstraint(required_scope=("country",)),
+            }
+        }
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT"
+    ]
+
+
+def test_typecheck_scope_context_does_not_leak_between_top_level_objects() -> None:
+    source = "technology={ who = TAG }\nfocus={ who = TAG }\n"
+    custom_rule = FieldScopeContextRule(
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country",)),
+                ("who",): RuleFieldScopeConstraint(required_scope=("country",)),
+            },
+            "focus": {
+                ("who",): RuleFieldScopeConstraint(required_scope=("country",)),
+            },
+        }
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_SCOPE_CONTEXT"
+    ]
+
+
 def test_default_typecheck_rules_accept_injected_services_policy() -> None:
     services = TypecheckServices(policy=TypecheckPolicy(unresolved_asset="error"))
 

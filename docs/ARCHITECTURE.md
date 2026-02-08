@@ -8,6 +8,32 @@ This document defines the architecture we are implementing in jominipy.
 - Current execution status belongs in `docs/HANDOFF.md`.
 - Forward plan belongs in `docs/NEXT_AGENT_ROADMAP.md`.
 
+## Critical Constraint: Biome Architecture Is Non-Negotiable
+- We do **not** adopt CWTools runtime architecture.
+- CWTools is the semantic source of truth for rule meaning, but not the execution model.
+- Required model:
+  - Biome-style staged pipeline (`parse -> normalize -> semantic graph -> deterministic checks`)
+  - precomputed/cached semantic artifacts
+  - deterministic rule execution ordering
+- Forbidden model:
+  - ad hoc recursive reinterpretation of rules during each validation walk
+  - implicit global mutable context between unrelated branches
+  - coupling completion-oriented internals directly into checker execution
+
+## CWTools Semantics Adapter Boundary
+- Any CWTools parity behavior that is non-trivial must be implemented as a semantic adapter layer, not a new runtime engine.
+- Adapter layer responsibilities:
+  - normalize CWTools-specific option semantics into typed internal contracts
+  - pre-resolve dynamic semantic inputs (where feasible) into cacheable artifacts
+  - expose stable, deterministic inputs to lint/typecheck engines
+- Examples of adapter-bound semantics:
+  - `replace_scope` channel semantics (`this/root/from*/prev*`)
+  - `push_scope` + `replace_scope` precedence compatibility mode
+  - alias/single-alias expansion
+  - subtype gating and conditional rule materialization
+  - complex enum materialization
+  - special-file semantic ingestion (`links`, `modifiers`, `values`, `localisation`)
+
 ## Toolchain scope (Biome-style)
 jominipy is a Biome-style toolchain for Paradox game scripts (Jomini/Clausewitz). The library provides:
 - Parser

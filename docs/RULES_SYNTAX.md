@@ -7,6 +7,12 @@ To use custom `.cwt` files place them in a folder called `.cwtools` in the folde
 ## Implementation Checklist (jominipy status)
 This checklist tracks what parts of the CWTools rules syntax are currently implemented in jominipy and what is still pending.
 
+### Parity framing (important)
+- Architecture target: Biome-style staged pipeline and deterministic checks.
+- Semantic target: CWTools-compatible rule meaning.
+- Explicit constraint: do not replicate CWTools runtime architecture/pipeline internals.
+- Practical approach: implement CWTools semantics through adapter passes over normalized IR and schema artifacts.
+
 ### Implemented now
 - [x] Parse `.cwt` files into normalized IR statements (`key`, `operator`, RHS expression kind, source ranges).
 - [x] Parse and attach comment metadata (`##` options, `###` docs).
@@ -30,6 +36,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] Scope-context tracking checks for field declarations using `push_scope`/`replace_scope` transitions on nested field paths.
   - [x] Added branch/isolation hardening tests to ensure sibling-path scope transitions do not leak across unrelated field branches.
   - [x] Added replace-scope alias override tests for `from`/`prev` chain behavior.
+  - [x] Added ambiguity detection for conflicting `replace_scope` alias mappings (`TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT`).
   - [x] Initial dynamic `value_set[...]` capture + `value[...]` membership checks from parsed field facts (with `value_set[...]` treated as setter/register, not membership-check target).
   - [x] Project-root type-membership auto-wiring path for typecheck/check entrypoints.
 
@@ -44,13 +51,32 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 ### Not implemented yet (pending)
 - [ ] Strict handling for remaining primitive-family semantics (tighter variable/value reference semantics and project-policy decisions for unresolved asset lookups).
 - [ ] Full type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms) against project-discovered members.
-- [ ] Final scope-resolution hardening (`scope[...]` + alias chain) across deeper cross-object flows and ambiguous replacement edge cases.
+- [ ] Final scope-resolution hardening (`scope[...]` + alias chain) across deeper cross-object flows and remaining non-trivial replacement edge cases.
 - [ ] Full value/value_set dynamic validation across files and execution scopes.
 - [ ] Alias/single-alias expansion and validation wiring.
 - [ ] Subtype resolution and subtype-conditional rule application.
 - [ ] Special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
 - [ ] Full schema graph wiring into resolved correctness checks (enum/type/scope/value validation in typecheck).
 - [ ] Complete migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
+
+### Highest-priority parity gaps (full-surface audit)
+- [ ] Alias/single-alias expansion and rule-application semantics (currently indexed but not executed semantically).
+- [ ] Subtype gating/materialization (`type_key_filter`, subtype `push_scope`, `starts_with`, etc.).
+- [ ] Complex enum generation from project files.
+- [ ] Special-file semantic ingestion beyond current `scopes` alias loading.
+- [ ] Option-surface parity for non-core options used by CWTools execution (`comparison`, `error_if_only_match`, reference labels).
+- [ ] Compatibility decision for strict CWTools `push_scope`/`replace_scope` precedence behavior.
+
+### Confirmed current behavior differences to track
+- `replace_scope` parsing:
+  - CWTools parses via script parser into typed channels (`this/root/from*/prev*`).
+  - jominipy currently parses generic key/value pairs and resolves aliases in typecheck.
+- `push_scope` model:
+  - CWTools uses singular `pushScope`.
+  - jominipy currently stores list-form `push_scope` and composes transitions generically.
+- Ambiguity diagnostics:
+  - jominipy emits `TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT` for conflicting replace mappings.
+  - CWTools behavior here is less explicit; keep this as intentional hardening unless strict-compat mode requires otherwise.
 
 ### HOI4 icon resolution note
 - In HOI4 rules, many gameplay `icon` fields (for example in `common/national_focus/*.txt`) are typed as `<spriteType>` in `references/hoi4-rules/Config/common/national_focus.cwt`.

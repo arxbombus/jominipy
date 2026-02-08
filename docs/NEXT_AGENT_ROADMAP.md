@@ -7,6 +7,11 @@ This roadmap is implementation-first and ordered to minimize rework.
 - `Foundation Milestones A-F` are completed historical milestones that remain important reference material.
 - Use `docs/RULES_SYNTAX.md` checklist as the active execution order for CWTools rule semantics work.
 
+## Non-negotiable implementation constraint
+- Keep Biome-style architecture and performance profile.
+- Do not migrate toward CWTools runtime architecture (known performance issues and pipeline inefficiencies).
+- Implement CWTools parity via semantic adapter stages over normalized IR/schema artifacts.
+
 ## Current baseline (already landed)
 - Lexer/parser/CST pipeline is stable and Biome-style.
 - AST v1 exists (`jominipy/ast/model.py`, `jominipy/ast/scalar.py`, `jominipy/ast/lower.py`) and lowers from CST.
@@ -105,16 +110,15 @@ Status:
   - deterministic lint rule registry scaffold with semantic/style split (`jominipy/lint/rules.py`)
   - entrypoint orchestration update: `run_typecheck(...)` and `run_check(...)` compose typecheck + lint over one parse
   - validation coverage: `tests/test_lint_typecheck_engines.py`
-- Next:
-  - follow the checklist in `docs/RULES_SYNTAX.md` (`Implementation Checklist (jominipy status)`) as execution order.
-  - complete lower-complexity typed checks first:
-    - primitive range enforcement (`int[...]`, `float[...]`)
-    - additional simple primitive families (`date_field`, `percentage_field`, etc.)
-  - then add resolved-reference checks over indexed schema data:
-    - enum membership (`enum[...]`)
-    - type references (`<type_key>` and related forms)
-    - scope-reference validation (`scope[...]`, `push_scope`, `replace_scope`)
-  - keep correctness checks migrating toward typecheck ownership; keep lint focused on policy/style/heuristics.
+- Next (reprioritized from full-surface parity audit):
+  - follow the checklist in `docs/RULES_SYNTAX.md` as execution order.
+  - implement advanced semantic execution gaps first:
+    1. alias/single-alias expansion and validation wiring
+    2. subtype gating/materialization and conditional rule application
+    3. complex enum generation from project files
+    4. special-file semantic providers (`links`, `modifiers`, `values`, `localisation`)
+    5. non-core option semantics parity (`comparison`, `error_if_only_match`, reference labels)
+  - continue correctness migration to typecheck ownership; keep lint policy/style/heuristics only.
 
 ## Phase 1.1: Rules Parity Execution Plan (2026-02-08, approved proposal)
 Goal: implement CWTools rules semantics with explicit Biome-style ownership boundaries and one shared parse lifecycle.
@@ -135,13 +139,17 @@ Execution phases (ordered):
    - enforce `scope[...]` with scope-stack transitions from `push_scope`/`replace_scope`.
 5. Advanced CWTools semantics:
    - wire alias/single-alias expansion, subtype-conditional application, and special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`).
+6. Option-surface compatibility pass:
+   - add parity behavior for non-core CWTools options used in execution (`comparison`, `error_if_only_match`, reference labels).
 
 Phase 1.1 progress:
 - Completed: Phase A schema graph foundation (`jominipy/rules/schema_graph.py`) and semantic-loader wiring to cross-file HOI4 config graph.
 - Completed: Phase B nested analysis facts (`jominipy/analysis/facts.py`) with deterministic object/field path + occurrence indexing.
 - Completed (initial): Phase C primitive/range correctness in typecheck (`jominipy/typecheck/rules.py`) with lint/typecheck ownership migration for field-type constraints.
 - Completed (additional): registry-backed `filepath`/`icon` validation contract via `AssetRegistry` (`jominipy/typecheck/assets.py`) and typecheck integration.
-- Next: finish tighter variable/value reference semantics, then Phase D resolved-reference correctness checks (prioritize `<spriteType>` membership for HOI4 icon fields before direct icon-filename assumptions).
+- Next:
+  - execute Phase 5 first (alias/single-alias + subtype + complex enum + special files), then Phase 6 option parity.
+  - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 
 Boundary constraints (must remain true):
 - `typecheck` owns correctness diagnostics (`TYPECHECK_*`, `domain=correctness`, `confidence=sound`).

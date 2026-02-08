@@ -100,6 +100,13 @@ TYPECHECK_INVALID_SCOPE_CONTEXT: Final[DiagnosticSpec] = DiagnosticSpec(
     category="typecheck",
 )
 
+TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT",
+    message="Scope context is ambiguous due to conflicting scope alias replacements.",
+    severity="warning",
+    category="typecheck",
+)
+
 LINT_SEMANTIC_INCONSISTENT_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
     code="LINT_SEMANTIC_INCONSISTENT_SHAPE",
     message="Semantic rule: mixed value shapes should be normalized.",

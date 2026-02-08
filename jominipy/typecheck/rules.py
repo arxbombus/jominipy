@@ -15,6 +15,7 @@ from jominipy.ast import (
     interpret_scalar,
 )
 from jominipy.diagnostics import (
+    TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT,
     TYPECHECK_INCONSISTENT_VALUE_SHAPE,
     TYPECHECK_INVALID_FIELD_REFERENCE,
     TYPECHECK_INVALID_FIELD_TYPE,
@@ -70,6 +71,7 @@ class ScopeContext:
 
     active_scopes: frozenset[str]
     aliases: Mapping[str, str]
+    ambiguity: str | None = None
 
 
 class TypecheckRule(Protocol):
@@ -228,6 +230,21 @@ class FieldReferenceConstraintRule:
                         relative_path=relative_path,
                         by_path=scope_constraints.get(object_key, {}),
                     )
+                    if scope_context.ambiguity is not None:
+                        diagnostics.append(
+                            Diagnostic(
+                                code=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.code,
+                                message=(
+                                    f"{TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.message} "
+                                    f"`{object_key}.{field_name}`: {scope_context.ambiguity}"
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.severity,
+                                hint="Remove conflicting replace_scope alias mappings.",
+                                category=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.category,
+                            )
+                        )
+                        continue
                     if non_reference_specs and _matches_value_specs(
                         field_fact.value,
                         non_reference_specs,
@@ -290,6 +307,22 @@ class FieldScopeContextRule:
                 continue
 
             active_scopes = _resolve_active_scopes_before_path(relative_path=relative_path, by_path=by_object)
+            scope_context = _resolve_scope_context_before_path(relative_path=relative_path, by_path=by_object)
+            if scope_context.ambiguity is not None:
+                diagnostics.append(
+                    Diagnostic(
+                        code=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.code,
+                        message=(
+                            f"{TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.message} "
+                            f"`{'.'.join(relative_path)}`: {scope_context.ambiguity}"
+                        ),
+                        range=_find_key_occurrence_range(text, field_fact.object_key, field_fact.object_occurrence),
+                        severity=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.severity,
+                        hint="Remove conflicting replace_scope alias mappings.",
+                        category=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.category,
+                    )
+                )
+                continue
             required = set(scope.lower() for scope in declaration_constraint.required_scope)
             if active_scopes and required.intersection(active_scopes):
                 continue
@@ -752,6 +785,7 @@ def _resolve_scope_context_before_path(
     by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
 ) -> ScopeContext:
     aliases: dict[str, str] = {}
+    ambiguity: str | None = None
     path_prefixes: list[tuple[str, ...]] = [()]
     for i in range(1, len(relative_path)):
         path_prefixes.append(relative_path[:i])
@@ -764,9 +798,17 @@ def _resolve_scope_context_before_path(
             for scope in constraint.push_scope:
                 _apply_push_scope(aliases, scope.lower())
         if constraint.replace_scope:
+            seen_local: dict[str, str] = {}
             for replacement in constraint.replace_scope:
                 source = replacement.source.lower()
                 target = replacement.target.lower()
+                previous = seen_local.get(source)
+                if previous is not None and previous != target and ambiguity is None:
+                    ambiguity = (
+                        f"replace_scope maps `{source}` to both `{previous}` and `{target}` at path "
+                        f"`{'.'.join(prefix) or '<root>'}`"
+                    )
+                seen_local[source] = target
                 aliases[source] = target
                 if source == "this" and "root" not in aliases:
                     aliases["root"] = target
@@ -774,6 +816,7 @@ def _resolve_scope_context_before_path(
     return ScopeContext(
         active_scopes=active_scopes,
         aliases=MappingProxyType(dict(aliases)),
+        ambiguity=ambiguity,
     )
 
 

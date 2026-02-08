@@ -32,14 +32,33 @@ Every agent must perform this checklist before finishing a substantive task:
 ## Quick Read (Operational)
 - Active workstream: CWTools rules ingest -> normalized IR -> typed semantic enforcement.
 - Current sequencing source of truth: `docs/RULES_SYNTAX.md` -> `Implementation Checklist (jominipy status)`.
+- Critical architectural constraint:
+  - keep Biome-style staged architecture; do not switch to CWTools runtime architecture.
+  - CWTools is semantic source, not execution-model source.
 - Immediate implementation order:
-  1. finish strict remaining primitive-family semantics in typecheck (tighter variable/value reference semantics and unresolved-asset policy)
-  2. implement resolved reference correctness (`enum[...]`, `<type_key>`, `scope[...]`) with first-class `<spriteType>` coverage for HOI4 `icon` fields
-  3. wire advanced semantics (alias/single-alias/subtype/special files)
+  1. alias/single-alias semantic expansion + validation wiring
+  2. subtype gating/materialization + conditional rule application
+  3. complex enum derivation pipeline
+  4. special-file semantic providers (`links`, `modifiers`, `values`, `localisation`) and checker wiring
+  5. remaining option-surface parity (`comparison`, `error_if_only_match`, reference labels)
 - Core invariants remain required:
   - one parse/facts lifecycle (`JominiParseResult`)
   - lint/typecheck boundary contracts
   - Biome parity tracking in `docs/BIOME_PARITY.md`
+
+## Latest Parity Findings (2026-02-08)
+- Scope work has improved materially:
+  - alias-chain resolution now includes `this/root/from*/prev*`.
+  - sibling/top-level scope isolation tests exist.
+  - ambiguity detection exists for conflicting `replace_scope`.
+- Full-surface parity gaps now clearly identified:
+  - alias/single-alias execution semantics not implemented end-to-end
+  - subtype execution semantics not implemented end-to-end
+  - complex enum generation not implemented
+  - special-file semantics only partially integrated (`scopes` aliases currently consumed; other files pending)
+  - non-core option semantics (`comparison`, `error_if_only_match`, reference labels) not wired
+- Compatibility note:
+  - jominipy intentionally stays on Biome-style architecture and should add CWTools compatibility via semantic adapters only.
 
 ## Historical Landed State (through 2026-02-07)
 - Parser/CST pipeline is stable and unchanged during AST phases.
@@ -155,9 +174,10 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase B (nested analysis facts for object fields) is now landed.
 - Phase 1.1 Phase C (initial primitive/range correctness in typecheck + field-type correctness migration out of lint) is now landed.
 - Phase 1.1 Phase C extension (registry-backed `filepath`/`icon` checks via `AssetRegistry`) is now landed.
-- Immediate next step: complete stricter remaining primitive-family semantics (tighter variable/value references and unresolved-asset policy choices).
-- Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph and field-fact indexes, prioritizing `<spriteType>` membership checks for gameplay icons.
-- Update (current): scope-context transition checks and scope-alias resolution (`this/root/from/fromfrom...` + `prev/prevprev...`) are landed in typecheck, including sibling-branch non-leakage and replace-scope alias-override test coverage; remaining work is deeper cross-object/ambiguous replacement hardening.
+- Immediate next step: implement alias/single-alias semantic expansion and validation execution.
+- Immediate next step: implement subtype gating/materialization with deterministic conditional application.
+- Update (current): scope-context transition checks and scope-alias resolution (`this/root/from/fromfrom...` + `prev/prevprev...`) are landed in typecheck, including sibling-branch non-leakage and ambiguity diagnostics (`TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT`).
+- Immediate follow-up after subtype work: implement complex enums, then special-file semantic providers.
 - Technical-debt note (important): `project_root` service-binding for custom-injected typecheck rules (notably custom `value_set/value` constraints) is currently retained mainly for tests/compatibility and should be removed or narrowed once canonical rule-IR-based configuration is the only supported extension path.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
