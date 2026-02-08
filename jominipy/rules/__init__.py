@@ -1,5 +1,17 @@
 """CWTools-like rules ingest and normalized IR utilities."""
 
+from jominipy.rules.adapter import (
+    ExpandedFieldConstraints,
+    SubtypeMatcher,
+    build_alias_members_by_family,
+    build_expanded_field_constraints,
+    build_subtype_field_constraints_by_object,
+    build_subtype_matchers_by_object,
+    load_hoi4_alias_members_by_family,
+    load_hoi4_expanded_field_constraints,
+    load_hoi4_subtype_field_constraints_by_object,
+    load_hoi4_subtype_matchers_by_object,
+)
 from jominipy.rules.ir import (
     IndexedRuleStatement,
     RuleCardinality,
@@ -45,6 +57,7 @@ from jominipy.rules.type_members import (
 )
 
 __all__ = [
+    "ExpandedFieldConstraints",
     "IndexedRuleStatement",
     "LoadRulesResult",
     "RuleCardinality",
@@ -60,20 +73,29 @@ __all__ = [
     "RuleStatement",
     "RuleValueSpec",
     "RulesParseResult",
+    "SubtypeMatcher",
     "TypeDefinition",
+    "build_alias_members_by_family",
+    "build_expanded_field_constraints",
     "build_field_constraints_by_object",
     "build_field_scope_constraints_by_object",
     "build_required_fields_by_object",
     "build_schema_graph",
+    "build_subtype_field_constraints_by_object",
+    "build_subtype_matchers_by_object",
     "build_type_memberships_from_file_texts",
     "collect_file_texts_under_root",
     "extract_type_definitions",
+    "load_hoi4_alias_members_by_family",
     "load_hoi4_enum_values",
+    "load_hoi4_expanded_field_constraints",
     "load_hoi4_field_constraints",
     "load_hoi4_field_scope_constraints",
     "load_hoi4_known_scopes",
     "load_hoi4_required_fields",
     "load_hoi4_schema_graph",
+    "load_hoi4_subtype_field_constraints_by_object",
+    "load_hoi4_subtype_matchers_by_object",
     "load_hoi4_type_keys",
     "load_rules_directory",
     "load_rules_paths",

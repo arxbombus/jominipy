@@ -9,7 +9,7 @@ from jominipy.lint.rules import (
 )
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
-from jominipy.rules import RuleFieldConstraint, RuleValueSpec
+from jominipy.rules import RuleFieldConstraint, RuleValueSpec, SubtypeMatcher
 from jominipy.rules.ir import RuleScopeReplacement
 from jominipy.rules.semantics import RuleFieldScopeConstraint
 from jominipy.typecheck.assets import SetAssetRegistry
@@ -411,6 +411,102 @@ def test_typecheck_field_reference_rule_validates_scope_ref() -> None:
     typecheck_result = run_typecheck(source, rules=(custom_rule,))
     assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
         "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_field_reference_rule_validates_alias_match_left_membership() -> None:
+    source = "technology={ effect_key = add_stability }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "effect_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(
+                            kind="alias_match_left_ref",
+                            raw="alias_match_left[effect]",
+                            argument="effect",
+                        ),
+                    ),
+                ),
+            }
+        },
+        alias_memberships_by_family={"effect": frozenset({"add_stability"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_field_constraint_rule_applies_subtype_gating_per_object_occurrence() -> None:
+    source = "ship_size={ class=shipclass_starbase max_wings=yes }\nship_size={ class=shipclass_military max_wings=yes }\n"
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={"ship_size": {}},
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(subtype_name="starbase", expected_field_values=(("class", "shipclass_starbase"),)),
+                SubtypeMatcher(subtype_name="ship", expected_field_values=(("class", "shipclass_military"),)),
+            )
+        },
+        subtype_field_constraints_by_object={
+            "ship_size": {
+                "starbase": {
+                    "max_wings": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                    ),
+                },
+                "ship": {
+                    "max_wings": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="bool", primitive="bool", argument=None),),
+                    ),
+                },
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_TYPE"
+    ]
+
+
+def test_typecheck_field_reference_rule_applies_subtype_gating_per_object_occurrence() -> None:
+    source = "ship_size={ class=shipclass_starbase stance=defensive }\nship_size={ class=shipclass_military stance=defensive }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={"ship_size": {}},
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(subtype_name="starbase", expected_field_values=(("class", "shipclass_starbase"),)),
+                SubtypeMatcher(subtype_name="ship", expected_field_values=(("class", "shipclass_military"),)),
+            )
+        },
+        subtype_field_constraints_by_object={
+            "ship_size": {
+                "starbase": {
+                    "stance": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="enum_ref", raw="enum[stance]", argument="stance"),),
+                    ),
+                },
+                "ship": {
+                    "stance": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="enum_ref", raw="enum[stance]", argument="stance"),),
+                    ),
+                },
+            }
+        },
+        enum_values_by_key={"stance": frozenset({"offensive"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE",
+        "TYPECHECK_INVALID_FIELD_REFERENCE",
     ]
 
 

@@ -1,0 +1,285 @@
+"""CWTools semantics adapters over normalized rule/schema artifacts."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from functools import lru_cache
+import re
+
+from jominipy.rules.ir import RuleStatement
+from jominipy.rules.schema_graph import RuleSchemaGraph, load_hoi4_schema_graph
+from jominipy.rules.semantics import (
+    RuleFieldConstraint,
+    RuleValueSpec,
+    build_field_constraints_by_object,
+    extract_value_specs,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ExpandedFieldConstraints:
+    """Field constraints after semantic adapter expansion steps."""
+
+    by_object: dict[str, dict[str, RuleFieldConstraint]]
+
+
+@dataclass(frozen=True, slots=True)
+class SubtypeMatcher:
+    """Subtype matcher extracted from `type[...]` subtype declarations."""
+
+    subtype_name: str
+    expected_field_values: tuple[tuple[str, str], ...] = ()
+
+
+_SUBTYPE_PATTERN = re.compile(r"^subtype\[(?P<name>[^\]]+)\]$")
+
+
+def build_alias_members_by_family(schema: RuleSchemaGraph) -> dict[str, frozenset[str]]:
+    """Build alias-family membership maps from `alias[family:name]` declarations."""
+    aliases: dict[str, set[str]] = {}
+    for raw_name in schema.aliases_by_key:
+        if ":" not in raw_name:
+            continue
+        family, alias_name = raw_name.split(":", 1)
+        family = family.strip()
+        alias_name = alias_name.strip()
+        if not family or not alias_name:
+            continue
+        aliases.setdefault(family, set()).add(alias_name)
+    return {family: frozenset(names) for family, names in aliases.items()}
+
+
+def build_expanded_field_constraints(
+    schema: RuleSchemaGraph,
+    *,
+    include_implicit_required: bool = False,
+) -> ExpandedFieldConstraints:
+    """Build field constraints and apply single-alias expansion."""
+    base = build_field_constraints_by_object(
+        schema.top_level_rule_statements,
+        include_implicit_required=include_implicit_required,
+    )
+    single_alias_constraints = _collect_single_alias_constraints(schema)
+    expanded: dict[str, dict[str, RuleFieldConstraint]] = {}
+    for object_key, by_field in base.items():
+        expanded_fields: dict[str, RuleFieldConstraint] = {}
+        for field_name, constraint in by_field.items():
+            expanded_specs = _expand_single_alias_specs(
+                constraint.value_specs,
+                single_alias_constraints=single_alias_constraints,
+            )
+            expanded_fields[field_name] = RuleFieldConstraint(
+                required=constraint.required,
+                value_specs=expanded_specs,
+            )
+        expanded[object_key] = expanded_fields
+    subtype_constraints = build_subtype_field_constraints_by_object(schema)
+    for object_key, by_subtype in subtype_constraints.items():
+        for by_field in by_subtype.values():
+            target = expanded.setdefault(object_key, {})
+            for field_name, subtype_constraint in by_field.items():
+                existing = target.get(field_name)
+                if existing is None:
+                    target[field_name] = subtype_constraint
+                    continue
+                target[field_name] = RuleFieldConstraint(
+                    required=existing.required or subtype_constraint.required,
+                    value_specs=_merge_specs(existing.value_specs, subtype_constraint.value_specs),
+                )
+    return ExpandedFieldConstraints(by_object=expanded)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_alias_members_by_family() -> dict[str, frozenset[str]]:
+    """Load alias-family memberships from HOI4 schema graph."""
+    schema = load_hoi4_schema_graph()
+    return build_alias_members_by_family(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_expanded_field_constraints(
+    *,
+    include_implicit_required: bool = False,
+) -> dict[str, dict[str, RuleFieldConstraint]]:
+    """Load HOI4 field constraints with semantic adapter expansions applied."""
+    schema = load_hoi4_schema_graph()
+    if not schema.top_level_rule_statements:
+        return {}
+    return build_expanded_field_constraints(
+        schema,
+        include_implicit_required=include_implicit_required,
+    ).by_object
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_subtype_matchers_by_object() -> dict[str, tuple[SubtypeMatcher, ...]]:
+    """Load subtype matchers keyed by object/type name."""
+    schema = load_hoi4_schema_graph()
+    return build_subtype_matchers_by_object(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_subtype_field_constraints_by_object() -> dict[str, dict[str, dict[str, RuleFieldConstraint]]]:
+    """Load subtype-specific field constraints keyed by object->subtype->field."""
+    schema = load_hoi4_schema_graph()
+    return build_subtype_field_constraints_by_object(schema)
+
+
+def build_subtype_matchers_by_object(schema: RuleSchemaGraph) -> dict[str, tuple[SubtypeMatcher, ...]]:
+    """Build per-object subtype matchers from `type[...]` declarations."""
+    matchers: dict[str, list[SubtypeMatcher]] = {}
+    for object_key, declarations in schema.types_by_key.items():
+        bucket = matchers.setdefault(object_key, [])
+        for declaration in declarations:
+            statement = declaration.statement
+            if statement.value.kind != "block":
+                continue
+            for child in statement.value.block:
+                subtype_name = _subtype_name(child.key)
+                if subtype_name is None or child.value.kind != "block":
+                    continue
+                expected = _collect_subtype_expected_fields(child.value.block)
+                bucket.append(
+                    SubtypeMatcher(
+                        subtype_name=subtype_name,
+                        expected_field_values=expected,
+                    )
+                )
+    return {key: tuple(items) for key, items in matchers.items() if items}
+
+
+def build_subtype_field_constraints_by_object(
+    schema: RuleSchemaGraph,
+) -> dict[str, dict[str, dict[str, RuleFieldConstraint]]]:
+    """Build subtype-conditional field constraints from top-level object rules."""
+    single_alias_constraints = _collect_single_alias_constraints(schema)
+    output: dict[str, dict[str, dict[str, RuleFieldConstraint]]] = {}
+    for statement in schema.top_level_rule_statements:
+        object_key = statement.key
+        if object_key is None or statement.value.kind != "block":
+            continue
+        subtype_map: dict[str, dict[str, RuleFieldConstraint]] = {}
+        for child in statement.value.block:
+            subtype_name = _subtype_name(child.key)
+            if subtype_name is None or child.value.kind != "block":
+                continue
+            subtype_fields = _build_constraints_from_rule_block(
+                child.value.block,
+                single_alias_constraints=single_alias_constraints,
+            )
+            if subtype_fields:
+                subtype_map[subtype_name] = subtype_fields
+        if subtype_map:
+            output[object_key] = subtype_map
+    return output
+
+
+def _collect_single_alias_constraints(
+    schema: RuleSchemaGraph,
+) -> dict[str, RuleFieldConstraint]:
+    aliases: dict[str, RuleFieldConstraint] = {}
+    for alias_name, declarations in schema.single_aliases_by_key.items():
+        merged: tuple[RuleValueSpec, ...] = ()
+        for declaration in declarations:
+            statement = declaration.statement
+            if statement.kind != "key_value":
+                continue
+            specs = extract_value_specs(statement.value)
+            merged = _merge_specs(merged, specs)
+        if merged:
+            aliases[alias_name] = RuleFieldConstraint(required=False, value_specs=merged)
+    return aliases
+
+
+def _build_constraints_from_rule_block(
+    statements: tuple[RuleStatement, ...],
+    *,
+    single_alias_constraints: dict[str, RuleFieldConstraint],
+) -> dict[str, RuleFieldConstraint]:
+    by_field: dict[str, RuleFieldConstraint] = {}
+    for child in statements:
+        if child.kind != "key_value" or child.key is None:
+            continue
+        required = _is_required(child)
+        specs = _expand_single_alias_specs(
+            extract_value_specs(child.value),
+            single_alias_constraints=single_alias_constraints,
+        )
+        existing = by_field.get(child.key)
+        if existing is None:
+            by_field[child.key] = RuleFieldConstraint(required=required, value_specs=specs)
+            continue
+        by_field[child.key] = RuleFieldConstraint(
+            required=existing.required or required,
+            value_specs=_merge_specs(existing.value_specs, specs),
+        )
+    return by_field
+
+
+def _subtype_name(key: str | None) -> str | None:
+    if key is None:
+        return None
+    match = _SUBTYPE_PATTERN.match(key)
+    if match is None:
+        return None
+    name = match.group("name").strip()
+    return name or None
+
+
+def _collect_subtype_expected_fields(
+    statements: tuple[RuleStatement, ...],
+) -> tuple[tuple[str, str], ...]:
+    expected: list[tuple[str, str]] = []
+    for statement in statements:
+        if statement.kind != "key_value" or statement.key is None:
+            continue
+        if statement.value.kind != "scalar":
+            continue
+        raw = (statement.value.text or "").strip().strip('"')
+        if not raw:
+            continue
+        expected.append((statement.key, raw))
+    return tuple(expected)
+
+
+def _is_required(statement: RuleStatement) -> bool:
+    cardinality = statement.metadata.cardinality
+    if cardinality is None:
+        return False
+    if cardinality.minimum_unbounded:
+        return True
+    return bool(cardinality.minimum is not None and cardinality.minimum > 0)
+
+
+def _expand_single_alias_specs(
+    specs: tuple[RuleValueSpec, ...],
+    *,
+    single_alias_constraints: dict[str, RuleFieldConstraint],
+) -> tuple[RuleValueSpec, ...]:
+    expanded: tuple[RuleValueSpec, ...] = ()
+    for spec in specs:
+        if spec.kind != "single_alias_ref":
+            expanded = _merge_specs(expanded, (spec,))
+            continue
+        alias_name = (spec.argument or "").strip()
+        alias_constraint = single_alias_constraints.get(alias_name)
+        if alias_constraint is None:
+            expanded = _merge_specs(expanded, (spec,))
+            continue
+        expanded = _merge_specs(expanded, alias_constraint.value_specs)
+    return expanded
+
+
+def _merge_specs(
+    left: tuple[RuleValueSpec, ...],
+    right: tuple[RuleValueSpec, ...],
+) -> tuple[RuleValueSpec, ...]:
+    merged: list[RuleValueSpec] = list(left)
+    seen = {(spec.kind, spec.raw, spec.primitive, spec.argument) for spec in left}
+    for spec in right:
+        key = (spec.kind, spec.raw, spec.primitive, spec.argument)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(spec)
+    return tuple(merged)

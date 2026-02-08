@@ -43,11 +43,7 @@ def run_typecheck(
         resolved_services = build_typecheck_services_from_project_root(project_root=project_root)
     else:
         resolved_services = TypecheckServices()
-    resolved_rules = (
-        tuple(rules)
-        if rules is not None
-        else default_typecheck_rules(services=resolved_services)
-    )
+    resolved_rules = tuple(rules) if rules is not None else default_typecheck_rules(services=resolved_services)
     project_file_texts: dict[str, str] | None = None
     if rules is not None and (services is not None or project_root is not None):
         if project_root is not None:
@@ -134,6 +130,14 @@ def _bind_services_to_rules(
                 replacements["value_memberships_by_key"] = value_memberships
         if hasattr(rule, "known_scopes") and not getattr(rule, "known_scopes"):
             replacements["known_scopes"] = services.known_scopes
+        if hasattr(rule, "alias_memberships_by_family") and not getattr(rule, "alias_memberships_by_family"):
+            replacements["alias_memberships_by_family"] = services.alias_memberships_by_family
+        if hasattr(rule, "subtype_matchers_by_object") and not getattr(rule, "subtype_matchers_by_object"):
+            replacements["subtype_matchers_by_object"] = services.subtype_matchers_by_object
+        if hasattr(rule, "subtype_field_constraints_by_object") and not getattr(
+            rule, "subtype_field_constraints_by_object"
+        ):
+            replacements["subtype_field_constraints_by_object"] = services.subtype_field_constraints_by_object
         if replacements:
             bound.append(replace(rule, **replacements))
         else:

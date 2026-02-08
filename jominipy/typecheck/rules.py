@@ -22,6 +22,7 @@ from jominipy.diagnostics import (
     TYPECHECK_INVALID_SCOPE_CONTEXT,
     Diagnostic,
 )
+from jominipy.rules.adapter import SubtypeMatcher
 from jominipy.rules.semantics import (
     RuleFieldConstraint,
     RuleFieldScopeConstraint,
@@ -55,6 +56,7 @@ _REFERENCE_SPEC_KINDS = {
     "value_ref",
     "value_set_ref",
     "type_ref",
+    "alias_match_left_ref",
 }
 
 
@@ -126,6 +128,10 @@ class FieldConstraintRule:
     domain: TypecheckDomain = "correctness"
     confidence: TypecheckConfidence = "sound"
     field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
+        MappingProxyType({})
+    )
     asset_registry: AssetRegistry = NullAssetRegistry()
     policy: TypecheckPolicy = TypecheckPolicy()
 
@@ -139,17 +145,32 @@ class FieldConstraintRule:
             field_map = facts.object_field_map.get(object_key)
             if not field_map:
                 continue
-
-            for field_name, constraint in field_constraints.items():
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            subtype_constraints = self.subtype_field_constraints_by_object.get(object_key, {})
+            field_names = set(field_constraints.keys())
+            for by_field in subtype_constraints.values():
+                field_names.update(by_field.keys())
+            for field_name in sorted(field_names):
                 field_facts = field_map.get(field_name)
                 if not field_facts:
                     continue
-                primitive_specs = tuple(
-                    spec for spec in constraint.value_specs if spec.kind not in _REFERENCE_SPEC_KINDS
-                )
-                if not primitive_specs:
-                    continue
                 for field_fact in field_facts:
+                    constraint = _resolve_effective_field_constraint(
+                        object_key=object_key,
+                        object_occurrence=field_fact.object_occurrence,
+                        field_name=field_name,
+                        base_constraints=field_constraints,
+                        subtype_matchers=subtype_matchers,
+                        subtype_constraints=subtype_constraints,
+                        facts=facts,
+                    )
+                    if constraint is None:
+                        continue
+                    primitive_specs = tuple(
+                        spec for spec in constraint.value_specs if spec.kind not in _REFERENCE_SPEC_KINDS
+                    )
+                    if not primitive_specs:
+                        continue
                     if _matches_value_specs(
                         field_fact.value,
                         primitive_specs,
@@ -190,6 +211,11 @@ class FieldReferenceConstraintRule:
     type_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
     value_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
     known_scopes: frozenset[str] = frozenset()
+    alias_memberships_by_family: Mapping[str, frozenset[str]] = MappingProxyType({})
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
+        MappingProxyType({})
+    )
     field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
     policy: TypecheckPolicy = TypecheckPolicy()
 
@@ -211,20 +237,35 @@ class FieldReferenceConstraintRule:
             field_map = facts.object_field_map.get(object_key)
             if not field_map:
                 continue
-            for field_name, constraint in field_constraints.items():
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            subtype_constraints = self.subtype_field_constraints_by_object.get(object_key, {})
+            field_names = set(field_constraints.keys())
+            for by_field in subtype_constraints.values():
+                field_names.update(by_field.keys())
+            for field_name in sorted(field_names):
                 field_facts = field_map.get(field_name)
                 if not field_facts:
                     continue
-                reference_specs = tuple(
-                    spec for spec in constraint.value_specs if spec.kind in _REFERENCE_SPEC_KINDS
-                )
-                if not reference_specs:
-                    continue
-                non_reference_specs = tuple(
-                    spec for spec in constraint.value_specs if spec.kind not in _REFERENCE_SPEC_KINDS
-                )
-
                 for field_fact in field_facts:
+                    constraint = _resolve_effective_field_constraint(
+                        object_key=object_key,
+                        object_occurrence=field_fact.object_occurrence,
+                        field_name=field_name,
+                        base_constraints=field_constraints,
+                        subtype_matchers=subtype_matchers,
+                        subtype_constraints=subtype_constraints,
+                        facts=facts,
+                    )
+                    if constraint is None:
+                        continue
+                    reference_specs = tuple(
+                        spec for spec in constraint.value_specs if spec.kind in _REFERENCE_SPEC_KINDS
+                    )
+                    if not reference_specs:
+                        continue
+                    non_reference_specs = tuple(
+                        spec for spec in constraint.value_specs if spec.kind not in _REFERENCE_SPEC_KINDS
+                    )
                     relative_path = field_fact.path[1:]
                     scope_context = _resolve_scope_context_before_path(
                         relative_path=relative_path,
@@ -260,6 +301,7 @@ class FieldReferenceConstraintRule:
                         type_memberships_by_key=self.type_memberships_by_key,
                         value_memberships_by_key=merged_value_memberships,
                         known_scopes=known_scopes,
+                        alias_memberships_by_family=self.alias_memberships_by_family,
                         scope_context=scope_context,
                         policy=self.policy,
                     ):
@@ -356,12 +398,17 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
         InconsistentTopLevelShapeRule(),
         FieldConstraintRule(
             asset_registry=resolved_services.asset_registry,
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+            subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             policy=resolved_services.policy,
         ),
         FieldReferenceConstraintRule(
             type_memberships_by_key=resolved_services.type_memberships_by_key,
             value_memberships_by_key=resolved_services.value_memberships_by_key,
             known_scopes=resolved_services.known_scopes,
+            alias_memberships_by_family=resolved_services.alias_memberships_by_family,
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+            subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             policy=resolved_services.policy,
         ),
         FieldScopeContextRule(),
@@ -403,6 +450,79 @@ def _find_key_occurrence_range(text: str, key: str, occurrence: int) -> TextRang
             return _find_key_range(text, key)
         start = index + len(needle)
     return TextRange.at(TextSize(index), TextSize(len(key)))
+
+
+def _resolve_effective_field_constraint(
+    *,
+    object_key: str,
+    object_occurrence: int,
+    field_name: str,
+    base_constraints: Mapping[str, RuleFieldConstraint],
+    subtype_matchers: tuple[SubtypeMatcher, ...],
+    subtype_constraints: Mapping[str, Mapping[str, RuleFieldConstraint]],
+    facts: AnalysisFacts,
+) -> RuleFieldConstraint | None:
+    base = base_constraints.get(field_name)
+    active_subtypes = _resolve_active_subtypes(
+        object_key=object_key,
+        object_occurrence=object_occurrence,
+        matchers=subtype_matchers,
+        facts=facts,
+    )
+    merged = base
+    for subtype_name in active_subtypes:
+        subtype_by_field = subtype_constraints.get(subtype_name)
+        if not subtype_by_field:
+            continue
+        subtype_constraint = subtype_by_field.get(field_name)
+        if subtype_constraint is None:
+            continue
+        if merged is None:
+            merged = subtype_constraint
+            continue
+        merged = RuleFieldConstraint(
+            required=merged.required or subtype_constraint.required,
+            value_specs=_merge_value_specs(merged.value_specs, subtype_constraint.value_specs),
+        )
+    return merged
+
+
+def _resolve_active_subtypes(
+    *,
+    object_key: str,
+    object_occurrence: int,
+    matchers: tuple[SubtypeMatcher, ...],
+    facts: AnalysisFacts,
+) -> tuple[str, ...]:
+    if not matchers:
+        return ()
+    fields = facts.object_fields.get(object_key, ())
+    by_field: dict[str, list[AstScalar]] = {}
+    for field_fact in fields:
+        if field_fact.object_occurrence != object_occurrence:
+            continue
+        if not isinstance(field_fact.value, AstScalar):
+            continue
+        by_field.setdefault(field_fact.field_key, []).append(field_fact.value)
+    active: list[str] = []
+    for matcher in matchers:
+        if _matcher_applies(matcher, by_field=by_field):
+            active.append(matcher.subtype_name)
+    return tuple(active)
+
+
+def _matcher_applies(
+    matcher: SubtypeMatcher,
+    *,
+    by_field: Mapping[str, list[AstScalar]],
+) -> bool:
+    for field_name, expected_value in matcher.expected_field_values:
+        candidates = by_field.get(field_name, [])
+        if not candidates:
+            return False
+        if not any(_strip_scalar_quotes(value.raw_text) == expected_value for value in candidates):
+            return False
+    return True
 
 
 def _matches_value_specs(
@@ -565,6 +685,7 @@ def _matches_reference_specs(
     type_memberships_by_key: Mapping[str, frozenset[str]],
     value_memberships_by_key: Mapping[str, frozenset[str]],
     known_scopes: frozenset[str],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
     scope_context: ScopeContext,
     policy: TypecheckPolicy,
 ) -> bool:
@@ -577,6 +698,7 @@ def _matches_reference_specs(
             type_memberships_by_key=type_memberships_by_key,
             value_memberships_by_key=value_memberships_by_key,
             known_scopes=known_scopes,
+            alias_memberships_by_family=alias_memberships_by_family,
             scope_context=scope_context,
             policy=policy,
         )
@@ -593,6 +715,7 @@ def _matches_reference_spec(
     type_memberships_by_key: Mapping[str, frozenset[str]],
     value_memberships_by_key: Mapping[str, frozenset[str]],
     known_scopes: frozenset[str],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
     scope_context: ScopeContext,
     policy: TypecheckPolicy,
 ) -> bool:
@@ -655,6 +778,13 @@ def _matches_reference_spec(
         if not key:
             return policy.unresolved_reference == "defer"
         members = value_memberships_by_key.get(key)
+        if members is None:
+            return policy.unresolved_reference == "defer"
+        return raw in members
+    if spec.kind == "alias_match_left_ref":
+        if not key:
+            return policy.unresolved_reference == "defer"
+        members = alias_memberships_by_family.get(key)
         if members is None:
             return policy.unresolved_reference == "defer"
         return raw in members
@@ -768,6 +898,21 @@ def _merge_membership_maps(
     for key, values in right.items():
         merged.setdefault(key, set()).update(values)
     return {key: frozenset(values) for key, values in merged.items()}
+
+
+def _merge_value_specs(
+    left: tuple[RuleValueSpec, ...],
+    right: tuple[RuleValueSpec, ...],
+) -> tuple[RuleValueSpec, ...]:
+    merged: list[RuleValueSpec] = list(left)
+    seen = {(spec.kind, spec.raw, spec.primitive, spec.argument) for spec in left}
+    for spec in right:
+        key = (spec.kind, spec.raw, spec.primitive, spec.argument)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(spec)
+    return tuple(merged)
 
 
 def _resolve_active_scopes_before_path(

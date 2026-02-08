@@ -4,8 +4,13 @@ from jominipy.rules import (
     RuleFieldConstraint,
     RuleSchemaGraph,
     RuleValueSpec,
+    build_alias_members_by_family,
+    build_expanded_field_constraints,
     build_field_constraints_by_object,
     build_required_fields_by_object,
+    build_schema_graph,
+    build_subtype_field_constraints_by_object,
+    build_subtype_matchers_by_object,
     load_hoi4_enum_values,
     load_hoi4_known_scopes,
     load_hoi4_required_fields,
@@ -228,3 +233,81 @@ def test_hoi4_known_scopes_load_from_schema_graph() -> None:
 
     assert "country" in scopes
     assert "state" in scopes
+
+
+def test_single_alias_references_are_expanded_in_field_constraints() -> None:
+    source = """single_alias[test_clause] = { value = int }
+technology = {
+    clause = single_alias_right[test_clause]
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-single-alias.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    expanded = build_expanded_field_constraints(schema).by_object
+    clause = expanded["technology"]["clause"]
+    assert clause.value_specs == (
+        RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),
+    )
+
+
+def test_alias_memberships_are_grouped_by_family() -> None:
+    source = """alias[effect:add_stability] = int
+alias[effect:add_war_support] = int
+alias[trigger:has_government] = bool
+"""
+    parsed = parse_rules_text(source, source_path="inline-alias-members.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    memberships = build_alias_members_by_family(schema)
+    assert memberships["effect"] == frozenset({"add_stability", "add_war_support"})
+    assert memberships["trigger"] == frozenset({"has_government"})
+
+
+def test_subtype_matchers_are_extracted_from_type_definitions() -> None:
+    source = """types = {
+    type[ship_size] = {
+        subtype[starbase] = { class = shipclass_starbase }
+        subtype[ship] = { class = shipclass_military }
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-subtype-matchers.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    matchers = build_subtype_matchers_by_object(schema)
+    assert tuple(m.subtype_name for m in matchers["ship_size"]) == ("starbase", "ship")
+    assert matchers["ship_size"][0].expected_field_values == (("class", "shipclass_starbase"),)
+    assert matchers["ship_size"][1].expected_field_values == (("class", "shipclass_military"),)
+
+
+def test_subtype_field_constraints_are_extracted_from_object_rules() -> None:
+    source = """ship_size = {
+    subtype[starbase] = {
+        max_wings = int
+    }
+    subtype[ship] = {
+        combat_disengage_chance = float
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-subtype-fields.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    constraints = build_subtype_field_constraints_by_object(schema)
+    assert constraints["ship_size"]["starbase"]["max_wings"] == RuleFieldConstraint(
+        required=False,
+        value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+    )
+    assert constraints["ship_size"]["ship"]["combat_disengage_chance"] == RuleFieldConstraint(
+        required=False,
+        value_specs=(RuleValueSpec(kind="primitive", raw="float", primitive="float", argument=None),),
+    )

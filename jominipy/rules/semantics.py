@@ -25,6 +25,8 @@ type RuleValueSpecKind = Literal[
     "scope_ref",
     "value_ref",
     "value_set_ref",
+    "alias_match_left_ref",
+    "single_alias_ref",
     "type_ref",
     "unknown_ref",
     "block",
@@ -110,7 +112,7 @@ def build_field_constraints_by_object(
                 continue
 
             required = _is_required(child.metadata, include_implicit_required=include_implicit_required)
-            specs = _extract_value_specs(child.value)
+            specs = extract_value_specs(child.value)
             existing = constraints.get(child.key)
             if existing is None:
                 constraints[child.key] = RuleFieldConstraint(required=required, value_specs=specs)
@@ -186,7 +188,7 @@ def _collect_scope_constraints(
             _collect_scope_constraints(statement.value.block, path=child_path, output=output)
 
 
-def _extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...]:
+def extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...]:
     if expression.kind == "missing":
         return (RuleValueSpec(kind="missing", raw=""),)
     if expression.kind == "error":
@@ -247,6 +249,10 @@ def _extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...
         return (RuleValueSpec(kind="value_ref", raw=text, argument=argument),)
     if lower_head == "value_set":
         return (RuleValueSpec(kind="value_set_ref", raw=text, argument=argument),)
+    if lower_head == "alias_match_left":
+        return (RuleValueSpec(kind="alias_match_left_ref", raw=text, argument=argument),)
+    if lower_head == "single_alias_right":
+        return (RuleValueSpec(kind="single_alias_ref", raw=text, argument=argument),)
 
     return (RuleValueSpec(kind="unknown_ref", raw=text, argument=argument),)
 
@@ -285,12 +291,9 @@ def load_hoi4_field_constraints(
     include_implicit_required: bool = False,
 ) -> dict[str, dict[str, RuleFieldConstraint]]:
     """Load per-object field constraints from the HOI4 cross-file CWTools schema."""
-    schema = load_hoi4_schema_graph()
-    if not schema.top_level_rule_statements:
-        return {}
+    from jominipy.rules.adapter import load_hoi4_expanded_field_constraints
 
-    return build_field_constraints_by_object(
-        schema.top_level_rule_statements,
+    return load_hoi4_expanded_field_constraints(
         include_implicit_required=include_implicit_required,
     )
 

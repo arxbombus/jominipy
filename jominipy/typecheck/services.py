@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal, Mapping
 
+from jominipy.rules.adapter import SubtypeMatcher
+from jominipy.rules.semantics import RuleFieldConstraint
 from jominipy.typecheck.assets import AssetRegistry, NullAssetRegistry
 
 type UnresolvedPolicy = Literal["defer", "error"]
@@ -32,6 +34,15 @@ class TypecheckServices:
         default_factory=lambda: MappingProxyType({})
     )
     known_scopes: frozenset[str] = frozenset()
+    alias_memberships_by_family: Mapping[str, frozenset[str]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
 
 def build_typecheck_services_from_file_texts(
@@ -44,9 +55,12 @@ def build_typecheck_services_from_file_texts(
     from jominipy.rules import (
         build_type_memberships_from_file_texts,
         extract_type_definitions,
+        load_hoi4_alias_members_by_family,
         load_hoi4_field_constraints,
         load_hoi4_known_scopes,
         load_hoi4_schema_graph,
+        load_hoi4_subtype_field_constraints_by_object,
+        load_hoi4_subtype_matchers_by_object,
     )
 
     schema = load_hoi4_schema_graph()
@@ -66,6 +80,9 @@ def build_typecheck_services_from_file_texts(
         type_memberships_by_key=MappingProxyType(memberships),
         value_memberships_by_key=MappingProxyType(value_memberships),
         known_scopes=load_hoi4_known_scopes(),
+        alias_memberships_by_family=MappingProxyType(load_hoi4_alias_members_by_family()),
+        subtype_matchers_by_object=MappingProxyType(load_hoi4_subtype_matchers_by_object()),
+        subtype_field_constraints_by_object=MappingProxyType(load_hoi4_subtype_field_constraints_by_object()),
     )
 
 
