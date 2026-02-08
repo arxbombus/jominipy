@@ -132,6 +132,8 @@ def _bind_services_to_rules(
                 replacements["value_memberships_by_key"] = value_memberships
         if hasattr(rule, "known_scopes") and not getattr(rule, "known_scopes"):
             replacements["known_scopes"] = services.known_scopes
+        if hasattr(rule, "link_definitions_by_name") and not getattr(rule, "link_definitions_by_name"):
+            replacements["link_definitions_by_name"] = services.link_definitions_by_name
         if hasattr(rule, "alias_memberships_by_family") and not getattr(rule, "alias_memberships_by_family"):
             replacements["alias_memberships_by_family"] = services.alias_memberships_by_family
         if hasattr(rule, "subtype_matchers_by_object") and not getattr(rule, "subtype_matchers_by_object"):

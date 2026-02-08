@@ -9,7 +9,12 @@ from jominipy.lint.rules import (
 )
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
-from jominipy.rules import RuleFieldConstraint, RuleValueSpec, SubtypeMatcher
+from jominipy.rules import (
+    LinkDefinition,
+    RuleFieldConstraint,
+    RuleValueSpec,
+    SubtypeMatcher,
+)
 from jominipy.rules.ir import RuleScopeReplacement
 from jominipy.rules.semantics import RuleFieldScopeConstraint
 from jominipy.typecheck.assets import SetAssetRegistry
@@ -527,6 +532,78 @@ def test_typecheck_runner_binds_service_enum_memberships_for_enum_refs() -> None
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,), services=services)
     assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_resolves_link_prefix_output_scope_when_input_scope_matches() -> None:
+    source = "technology={ target = var:foo }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="both",
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_rejects_link_prefix_when_input_scope_mismatches() -> None:
+    source = "technology={ target = var:foo }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="both",
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
 
 
 def test_typecheck_field_reference_rule_uses_dynamic_value_set_capture() -> None:

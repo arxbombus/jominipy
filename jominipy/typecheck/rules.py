@@ -22,7 +22,7 @@ from jominipy.diagnostics import (
     TYPECHECK_INVALID_SCOPE_CONTEXT,
     Diagnostic,
 )
-from jominipy.rules.adapter import SubtypeMatcher
+from jominipy.rules.adapter import LinkDefinition, SubtypeMatcher
 from jominipy.rules.semantics import (
     RuleFieldConstraint,
     RuleFieldScopeConstraint,
@@ -216,6 +216,7 @@ class FieldReferenceConstraintRule:
     subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
         MappingProxyType({})
     )
+    link_definitions_by_name: Mapping[str, LinkDefinition] = MappingProxyType({})
     field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
     policy: TypecheckPolicy = TypecheckPolicy()
 
@@ -304,6 +305,7 @@ class FieldReferenceConstraintRule:
                         value_memberships_by_key=merged_value_memberships,
                         known_scopes=known_scopes,
                         alias_memberships_by_family=self.alias_memberships_by_family,
+                        link_definitions_by_name=self.link_definitions_by_name,
                         scope_context=scope_context,
                         policy=self.policy,
                     ):
@@ -412,6 +414,7 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             alias_memberships_by_family=resolved_services.alias_memberships_by_family,
             subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
+            link_definitions_by_name=resolved_services.link_definitions_by_name,
             policy=resolved_services.policy,
         ),
         FieldScopeContextRule(),
@@ -689,6 +692,7 @@ def _matches_reference_specs(
     value_memberships_by_key: Mapping[str, frozenset[str]],
     known_scopes: frozenset[str],
     alias_memberships_by_family: Mapping[str, frozenset[str]],
+    link_definitions_by_name: Mapping[str, LinkDefinition],
     scope_context: ScopeContext,
     policy: TypecheckPolicy,
 ) -> bool:
@@ -702,6 +706,7 @@ def _matches_reference_specs(
             value_memberships_by_key=value_memberships_by_key,
             known_scopes=known_scopes,
             alias_memberships_by_family=alias_memberships_by_family,
+            link_definitions_by_name=link_definitions_by_name,
             scope_context=scope_context,
             policy=policy,
         )
@@ -719,6 +724,7 @@ def _matches_reference_spec(
     value_memberships_by_key: Mapping[str, frozenset[str]],
     known_scopes: frozenset[str],
     alias_memberships_by_family: Mapping[str, frozenset[str]],
+    link_definitions_by_name: Mapping[str, LinkDefinition],
     scope_context: ScopeContext,
     policy: TypecheckPolicy,
 ) -> bool:
@@ -770,7 +776,15 @@ def _matches_reference_spec(
                 return policy.unresolved_reference == "defer"
             candidate = resolved
         elif candidate not in known_scopes:
-            return policy.unresolved_reference == "defer"
+            link_scope = _resolve_scope_from_link_candidate(
+                candidate=candidate,
+                scope_context=scope_context,
+                link_definitions_by_name=link_definitions_by_name,
+                policy=policy,
+            )
+            if link_scope is None:
+                return policy.unresolved_reference == "defer"
+            candidate = link_scope
         return candidate == key.lower()
 
     if spec.kind == "value_set_ref":
@@ -808,6 +822,51 @@ def _build_filepath_candidate(*, raw_value: str, argument: str | None) -> str:
     if "," in spec:
         prefix, extension = (part.strip() for part in spec.split(",", 1))
     return f"{prefix}{raw_value}{extension}"
+
+
+def _resolve_scope_from_link_candidate(
+    *,
+    candidate: str,
+    scope_context: ScopeContext,
+    link_definitions_by_name: Mapping[str, LinkDefinition],
+    policy: TypecheckPolicy,
+) -> str | None:
+    if ":" not in candidate:
+        return None
+    prefix = candidate.split(":", 1)[0] + ":"
+    matches = [link for link in link_definitions_by_name.values() if (link.prefix or "").lower() == prefix]
+    if not matches:
+        return None
+    valid_scopes: list[str] = []
+    for link in matches:
+        output_scope = (link.output_scope or "").strip().lower()
+        if not output_scope:
+            continue
+        if not _link_input_scope_allows(link, scope_context=scope_context, policy=policy):
+            continue
+        valid_scopes.append(output_scope)
+    if not valid_scopes:
+        return None
+    unique = tuple(sorted(set(valid_scopes)))
+    if len(unique) != 1:
+        return None
+    return unique[0]
+
+
+def _link_input_scope_allows(
+    link: LinkDefinition,
+    *,
+    scope_context: ScopeContext,
+    policy: TypecheckPolicy,
+) -> bool:
+    if not link.input_scopes:
+        return True
+    normalized = {scope.lower() for scope in link.input_scopes}
+    if "any" in normalized:
+        return True
+    if not scope_context.active_scopes:
+        return policy.unresolved_reference == "defer"
+    return bool(set(scope_context.active_scopes).intersection(normalized))
 
 
 def _build_icon_candidate(*, raw_value: str, argument: str | None) -> str:

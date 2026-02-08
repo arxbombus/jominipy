@@ -56,7 +56,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Full alias expansion semantics beyond current `alias_match_left[...]` membership + `single_alias_right[...]` constraint expansion.
 - [ ] Full subtype semantics (`type_key_filter`, `starts_with`, subtype `push_scope`, ordering/precedence edge cases) beyond current field-value matcher gating.
 - [ ] Full complex enum semantics parity (additional path/structure edge cases and parity verification against CWTools behavior).
-- [ ] Special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
+- [ ] Full special-file semantics parity (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
 - [ ] Full schema graph wiring into resolved correctness checks (enum/type/scope/value validation in typecheck).
 - [ ] Complete migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
 
@@ -64,7 +64,11 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Full alias/single-alias execution parity (current pass covers `single_alias_right[...]` expansion and `alias_match_left[...]` membership checks only).
 - [ ] Full subtype gating/materialization parity (`type_key_filter`, subtype `push_scope`, `starts_with`, ordering semantics).
 - [ ] Full complex enum parity hardening (current pass materializes enums from project files with `name` tree + `start_from_root` + path filters).
-- [ ] Special-file semantic ingestion beyond current `scopes` alias loading.
+- [ ] Special-file semantic ingestion hardening:
+  - [x] `links.cwt` initial provider + scope-ref link-prefix/output-scope validation wiring.
+  - [x] `values` section initial provider merged into `value[...]` memberships.
+  - [ ] `modifiers` and `localisation` providers.
+  - [ ] deeper `links` parity (data-source and advanced chain semantics).
 - [ ] Option-surface parity for non-core options used by CWTools execution (`comparison`, `error_if_only_match`, reference labels).
 - [ ] Compatibility decision for strict CWTools `push_scope`/`replace_scope` precedence behavior.
 
@@ -495,6 +499,12 @@ Like pdxscript files, the `#` character is used to comment out lines. In `.cwt` 
 
 ### Special files
 In addition to types, enums and validation in .cwt files, there are several "magic" files used for defining core game concepts.
+
+#### Clarification: effects/triggers are not special files
+- Files like `effects.cwt`, `effects_aat.cwt`, `triggers.cwt`, and `triggers_toa.cwt` are treated as regular rules files in jominipy.
+- They are consumed directly by the normal pipeline (`parse -> normalize -> schema graph -> semantic adapters -> typecheck/lint`).
+- They do not require dedicated special-file providers.
+
 #### Game files (script_docs)
 In CK3, Imperator and Stellaris the game generated "script docs" are used where appropriate. For example, `triggers.log` is used to generate the scopes that triggers can be used in.
 #### scopes.cwt
@@ -539,3 +549,8 @@ This file contains a block `values` that contains multiple lists of hardcoded cw
 
 #### localisation.cwt
 This file contains a block `localisation_commands ` that contains a list of localistaion commands and what scope they can be used in. E.g. `GetMotherFather = { monarch heir consort advisor }`. This is only used in pre-jomini games.
+
+#### Localisation implementation sequencing (jominipy plan)
+- Stage 1: implement command/scope compatibility from `localisation.cwt` (`localisation_commands`, optional localisation-link metadata) as semantic adapter artifacts consumed by typecheck.
+- Stage 2: add localisation YAML ingestion for key existence/coverage checks (for required localisation keys and reference validation).
+- Rationale: command/scope parity is rules-semantic and should land first; YAML key checks are content-index validation and can be layered without changing architecture.

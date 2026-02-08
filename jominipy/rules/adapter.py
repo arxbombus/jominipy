@@ -59,6 +59,19 @@ class ComplexEnumDefinition:
     patterns: tuple[NameTreePattern, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class LinkDefinition:
+    """Normalized link definition from special-file `links` section."""
+
+    name: str
+    output_scope: str | None = None
+    input_scopes: tuple[str, ...] = ()
+    prefix: str | None = None
+    from_data: bool = False
+    data_sources: tuple[str, ...] = ()
+    link_type: str | None = None
+
+
 def build_alias_members_by_family(schema: RuleSchemaGraph) -> dict[str, frozenset[str]]:
     """Build alias-family membership maps from `alias[family:name]` declarations."""
     aliases: dict[str, set[str]] = {}
@@ -198,6 +211,79 @@ def load_hoi4_complex_enum_definitions() -> dict[str, tuple[ComplexEnumDefinitio
     return build_complex_enum_definitions(schema)
 
 
+def build_values_memberships_by_key(schema: RuleSchemaGraph) -> dict[str, frozenset[str]]:
+    """Build memberships from special-file `values` section (`value[key] = { ... }`)."""
+    memberships: dict[str, set[str]] = {}
+    for section in schema.sections_by_key.get("values", ()):
+        statement = section.statement
+        if statement.value.kind != "block":
+            continue
+        for child in statement.value.block:
+            if child.kind != "key_value" or child.key is None:
+                continue
+            parsed = _parse_bracket_key(child.key, expected_family="value")
+            if parsed is None:
+                continue
+            value_key = parsed
+            if child.value.kind != "block":
+                continue
+            bucket = memberships.setdefault(value_key, set())
+            for leaf in child.value.block:
+                if leaf.kind != "value" or leaf.value.kind != "scalar":
+                    continue
+                raw = (leaf.value.text or "").strip().strip('"')
+                if raw:
+                    bucket.add(raw)
+    return {key: frozenset(values) for key, values in memberships.items()}
+
+
+def build_link_definitions(schema: RuleSchemaGraph) -> dict[str, LinkDefinition]:
+    """Build link definitions from special-file `links` section."""
+    links: dict[str, LinkDefinition] = {}
+    for section in schema.sections_by_key.get("links", ()):
+        statement = section.statement
+        if statement.value.kind != "block":
+            continue
+        for child in statement.value.block:
+            if child.kind != "key_value" or child.key is None:
+                continue
+            name = child.key.strip()
+            if not name or child.value.kind != "block":
+                continue
+            (
+                output_scope,
+                input_scopes,
+                prefix,
+                from_data,
+                data_sources,
+                link_type,
+            ) = _collect_link_options(child.value.block)
+            links[name] = LinkDefinition(
+                name=name,
+                output_scope=output_scope,
+                input_scopes=input_scopes,
+                prefix=prefix,
+                from_data=from_data,
+                data_sources=data_sources,
+                link_type=link_type,
+            )
+    return links
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_values_memberships_by_key() -> dict[str, frozenset[str]]:
+    """Load special-file values memberships from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_values_memberships_by_key(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_link_definitions() -> dict[str, LinkDefinition]:
+    """Load special-file link definitions from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_link_definitions(schema)
+
+
 def build_subtype_matchers_by_object(schema: RuleSchemaGraph) -> dict[str, tuple[SubtypeMatcher, ...]]:
     """Build per-object subtype matchers from `type[...]` declarations."""
     matchers: dict[str, list[SubtypeMatcher]] = {}
@@ -274,6 +360,50 @@ def _find_scalar_child(statements: tuple[RuleStatement, ...], key: str) -> str |
     return None
 
 
+def _collect_link_options(
+    statements: tuple[RuleStatement, ...],
+) -> tuple[str | None, tuple[str, ...], str | None, bool, tuple[str, ...], str | None]:
+    output_scope = _find_scalar_child(statements, "output_scope")
+    prefix = _find_scalar_child(statements, "prefix")
+    link_type = _find_scalar_child(statements, "type")
+    from_data = (_find_scalar_child(statements, "from_data") or "").lower() == "yes"
+    data_sources: list[str] = []
+    input_scopes: tuple[str, ...] = ()
+    for statement in statements:
+        if statement.kind != "key_value" or statement.key is None:
+            continue
+        if statement.key == "data_source" and statement.value.kind == "scalar":
+            raw = (statement.value.text or "").strip()
+            if raw:
+                data_sources.append(raw)
+            continue
+        if statement.key == "input_scopes":
+            input_scopes = _extract_scope_list(statement)
+    return (
+        output_scope.lower() if output_scope else None,
+        tuple(scope.lower() for scope in input_scopes),
+        prefix,
+        from_data,
+        tuple(data_sources),
+        link_type.lower() if link_type else None,
+    )
+
+
+def _extract_scope_list(statement: RuleStatement) -> tuple[str, ...]:
+    if statement.value.kind == "scalar":
+        raw = (statement.value.text or "").strip().strip('"')
+        return (raw,) if raw else ()
+    if statement.value.kind != "block":
+        return ()
+    scopes: list[str] = []
+    for child in statement.value.block:
+        if child.kind == "value" and child.value.kind == "scalar":
+            raw = (child.value.text or "").strip().strip('"')
+            if raw:
+                scopes.append(raw)
+    return tuple(scopes)
+
+
 def _find_block_child(statements: tuple[RuleStatement, ...], key: str) -> RuleStatement | None:
     for statement in statements:
         if statement.kind != "key_value" or statement.key != key:
@@ -282,6 +412,14 @@ def _find_block_child(statements: tuple[RuleStatement, ...], key: str) -> RuleSt
             continue
         return statement
     return None
+
+
+def _parse_bracket_key(raw_key: str, *, expected_family: str) -> str | None:
+    prefix = f"{expected_family}["
+    if not raw_key.startswith(prefix) or not raw_key.endswith("]"):
+        return None
+    inner = raw_key[len(prefix) : -1].strip()
+    return inner or None
 
 
 def _build_name_tree_pattern(statement: RuleStatement) -> NameTreePattern | None:

@@ -33,6 +33,7 @@ This document defines the architecture we are implementing in jominipy.
   - subtype gating and conditional rule materialization
   - complex enum materialization
   - special-file semantic ingestion (`links`, `modifiers`, `values`, `localisation`)
+  - localisation command/scope semantics as precomputed artifacts (not runtime callback-driven validation)
 
 ## Toolchain scope (Biome-style)
 jominipy is a Biome-style toolchain for Paradox game scripts (Jomini/Clausewitz). The library provides:

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from jominipy.rules import (
+    LinkDefinition,
     RuleFieldConstraint,
     RuleSchemaGraph,
     RuleValueSpec,
@@ -9,10 +10,12 @@ from jominipy.rules import (
     build_complex_enum_values_from_file_texts,
     build_expanded_field_constraints,
     build_field_constraints_by_object,
+    build_link_definitions,
     build_required_fields_by_object,
     build_schema_graph,
     build_subtype_field_constraints_by_object,
     build_subtype_matchers_by_object,
+    build_values_memberships_by_key,
     load_hoi4_enum_values,
     load_hoi4_known_scopes,
     load_hoi4_required_fields,
@@ -366,3 +369,50 @@ def test_complex_enum_start_from_root_walks_top_level_children() -> None:
         definitions_by_key=definitions,
     )
     assert values["root_keys"] == frozenset({"alpha", "beta"})
+
+
+def test_values_memberships_are_extracted_from_values_section() -> None:
+    source = """values = {
+    value[event_target] = {
+        context
+        actor
+        recipient
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-values.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    memberships = build_values_memberships_by_key(schema)
+    assert memberships["event_target"] == frozenset({"context", "actor", "recipient"})
+
+
+def test_links_definitions_are_extracted_from_links_section() -> None:
+    source = """links = {
+    var = {
+        from_data = yes
+        type = both
+        prefix = var:
+        data_source = value[variable]
+        output_scope = country
+        input_scopes = { country state }
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-links.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    links = build_link_definitions(schema)
+    assert links["var"] == LinkDefinition(
+        name="var",
+        output_scope="country",
+        input_scopes=("country", "state"),
+        prefix="var:",
+        from_data=True,
+        data_sources=("value[variable]",),
+        link_type="both",
+    )

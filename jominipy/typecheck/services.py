@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal, Mapping
 
-from jominipy.rules.adapter import SubtypeMatcher
+from jominipy.rules.adapter import LinkDefinition, SubtypeMatcher
 from jominipy.rules.semantics import RuleFieldConstraint
 from jominipy.typecheck.assets import AssetRegistry, NullAssetRegistry
 
@@ -33,6 +33,9 @@ class TypecheckServices:
     value_memberships_by_key: Mapping[str, frozenset[str]] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    special_value_memberships_by_key: Mapping[str, frozenset[str]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
     known_scopes: frozenset[str] = frozenset()
     enum_memberships_by_key: Mapping[str, frozenset[str]] = field(
         default_factory=lambda: MappingProxyType({})
@@ -44,6 +47,9 @@ class TypecheckServices:
         default_factory=lambda: MappingProxyType({})
     )
     subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    link_definitions_by_name: Mapping[str, LinkDefinition] = field(
         default_factory=lambda: MappingProxyType({})
     )
 
@@ -63,9 +69,11 @@ def build_typecheck_services_from_file_texts(
         load_hoi4_complex_enum_definitions,
         load_hoi4_field_constraints,
         load_hoi4_known_scopes,
+        load_hoi4_link_definitions,
         load_hoi4_schema_graph,
         load_hoi4_subtype_field_constraints_by_object,
         load_hoi4_subtype_matchers_by_object,
+        load_hoi4_values_memberships_by_key,
     )
 
     schema = load_hoi4_schema_graph()
@@ -79,6 +87,8 @@ def build_typecheck_services_from_file_texts(
         file_texts_by_path=file_texts_by_path,
         field_constraints_by_object=field_constraints,
     )
+    special_value_memberships = load_hoi4_values_memberships_by_key()
+    merged_value_memberships = _merge_memberships(value_memberships, special_value_memberships)
     complex_enum_memberships = build_complex_enum_values_from_file_texts(
         file_texts_by_path=file_texts_by_path,
         definitions_by_key=load_hoi4_complex_enum_definitions(),
@@ -87,12 +97,14 @@ def build_typecheck_services_from_file_texts(
         asset_registry=asset_registry or NullAssetRegistry(),
         policy=policy or TypecheckPolicy(),
         type_memberships_by_key=MappingProxyType(memberships),
-        value_memberships_by_key=MappingProxyType(value_memberships),
+        value_memberships_by_key=MappingProxyType(merged_value_memberships),
+        special_value_memberships_by_key=MappingProxyType(special_value_memberships),
         known_scopes=load_hoi4_known_scopes(),
         enum_memberships_by_key=MappingProxyType(complex_enum_memberships),
         alias_memberships_by_family=MappingProxyType(load_hoi4_alias_members_by_family()),
         subtype_matchers_by_object=MappingProxyType(load_hoi4_subtype_matchers_by_object()),
         subtype_field_constraints_by_object=MappingProxyType(load_hoi4_subtype_field_constraints_by_object()),
+        link_definitions_by_name=MappingProxyType(load_hoi4_link_definitions()),
     )
 
 
@@ -147,3 +159,15 @@ def build_value_memberships_from_file_texts(
                     for key in keys:
                         memberships.setdefault(key, set()).add(raw)
     return {key: frozenset(values) for key, values in memberships.items()}
+
+
+def _merge_memberships(
+    left: Mapping[str, frozenset[str]],
+    right: Mapping[str, frozenset[str]],
+) -> dict[str, frozenset[str]]:
+    merged: dict[str, set[str]] = {}
+    for key, values in left.items():
+        merged.setdefault(key, set()).update(values)
+    for key, values in right.items():
+        merged.setdefault(key, set()).update(values)
+    return {key: frozenset(values) for key, values in merged.items()}

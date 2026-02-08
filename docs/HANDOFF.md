@@ -55,10 +55,14 @@ Every agent must perform this checklist before finishing a substantive task:
   - alias/single-alias execution semantics are now partially implemented (`single_alias_right` expansion + `alias_match_left` membership), but not end-to-end
   - subtype execution semantics are now partially implemented (deterministic subtype matcher gating), but not full CWTools parity
   - complex enum generation is now initially implemented (path/name-tree/start_from_root materialization), but not fully parity-hardened
-  - special-file semantics only partially integrated (`scopes` aliases currently consumed; other files pending)
+  - special-file semantics are now partially integrated (`scopes` + initial `values` and `links` providers); `modifiers/localisation` and deeper link parity remain
   - non-core option semantics (`comparison`, `error_if_only_match`, reference labels) not wired
+  - localisation parity remains pending and should be staged:
+    - command/scope semantics from `localisation.cwt` first,
+    - localisation YAML key-existence/coverage validation second.
 - Compatibility note:
   - jominipy intentionally stays on Biome-style architecture and should add CWTools compatibility via semantic adapters only.
+  - CWTools localisation validation is callback/service-driven at runtime (`processLocalisation`/`validateLocalisation`), while jominipy should keep precomputed adapter artifacts injected via services.
 
 ## Historical Landed State (through 2026-02-07)
 - Parser/CST pipeline is stable and unchanged during AST phases.
@@ -178,13 +182,14 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase E (initial subtype gating/materialization) is now landed.
 - Phase 1.1 Phase F (initial complex enum materialization) is now landed.
 - Update (current): scope-context transition checks and scope-alias resolution (`this/root/from/fromfrom...` + `prev/prevprev...`) are landed in typecheck, including sibling-branch non-leakage and ambiguity diagnostics (`TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT`).
-- Immediate next step: implement special-file semantic providers (`links`, `modifiers`, `values`, `localisation`) and checker wiring.
+- Phase 1.1 Phase G (initial special-file providers for `values` + `links`) is now landed.
+- Immediate next step: implement remaining special-file providers (`modifiers`, `localisation`) and deeper `links` data-source semantics.
 - Immediate follow-up: option-surface parity (`comparison`, `error_if_only_match`, reference labels), then strict precedence compatibility review for `push_scope`/`replace_scope`.
 - Drift correction note:
   - During subtype rollout, subtype constraints were briefly merged unconditionally into base constraints in the adapter.
   - This was corrected in the same iteration; subtype constraints now apply only through per-object-occurrence matcher resolution in typecheck.
 - Latest validation snapshot (post-alias/subtype/complex-enum phases):
-  - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`56 passed`)
+  - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`60 passed`)
   - `uv run ruff check jominipy tests` (passed)
 - Technical-debt note (important): `project_root` service-binding for custom-injected typecheck rules (notably custom `value_set/value` constraints) is currently retained mainly for tests/compatibility and should be removed or narrowed once canonical rule-IR-based configuration is the only supported extension path.
 - Phase 1 kickoff scope:

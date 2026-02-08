@@ -68,6 +68,14 @@ For every parser/CST/AST feature, record:
   - update (2026-02-08): alias/single-alias adapter wiring landed (`single_alias_right[...]` expansion + `alias_match_left[...]` membership checks) with checker integration.
   - update (2026-02-08): subtype adapter wiring landed (deterministic matcher gating + subtype-conditional field constraints in typecheck).
   - update (2026-02-08): complex enum materialization landed (project-file scan + name-tree traversal + `start_from_root`/path filtering) and is injected into enum reference checks through services.
+  - update (2026-02-08): special-file provider pass 1 landed:
+    - `values` section memberships merged into `value[...]` reference memberships,
+    - `links` definitions injected into typecheck scope-reference validation for link-prefix/output-scope transitions with input-scope gating.
+  - update (2026-02-08): clarified file-classification boundary:
+    - `effects*.cwt` and `triggers*.cwt` remain regular rules files (normal ingest/adapter path), not special-file providers.
+  - update (2026-02-08): localisation parity model clarified:
+    - CWTools uses runtime callback/service validation (`processLocalisation`/`validateLocalisation`),
+    - jominipy keeps Biome-style staged artifacts (adapter extraction + service injection), with YAML content indexing as a later layer.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.
