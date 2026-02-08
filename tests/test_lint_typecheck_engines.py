@@ -5,10 +5,12 @@ from jominipy.diagnostics import Diagnostic
 from jominipy.lint.rules import (
     LintConfidence,
     LintDomain,
+    SemanticInvalidFieldTypeRule,
     SemanticMissingRequiredFieldRule,
 )
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
+from jominipy.rules import RuleFieldConstraint, RuleValueSpec
 from jominipy.typecheck.rules import TypecheckFacts, TypecheckRule
 
 
@@ -115,3 +117,23 @@ def test_lint_cwtools_required_fields_rule_with_custom_schema() -> None:
 
     assert codes == ["LINT_SEMANTIC_MISSING_REQUIRED_FIELD"]
     assert "required_field" in lint_result.diagnostics[0].message
+
+
+def test_lint_cwtools_type_rule_with_custom_schema() -> None:
+    source = "technology={ level = yes }\n"
+    custom_rule = SemanticInvalidFieldTypeRule(
+        field_constraints_by_object={
+            "technology": {
+                "level": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                )
+            }
+        },
+    )
+
+    lint_result = run_lint(source, rules=(custom_rule,))
+    codes = [diagnostic.code for diagnostic in lint_result.diagnostics]
+
+    assert codes == ["LINT_SEMANTIC_INVALID_FIELD_TYPE"]
+    assert "technology.level" in lint_result.diagnostics[0].message

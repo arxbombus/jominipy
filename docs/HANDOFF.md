@@ -95,6 +95,17 @@ Every agent must perform this checklist before finishing a substantive task:
   - lint semantic rule migrated from hardcoded example policy to CWTools-derived required fields:
     - removed `start_year`-specific assumption
     - new diagnostic code: `LINT_SEMANTIC_MISSING_REQUIRED_FIELD`
+- CWTools typed RHS extraction + first typed validation landed:
+  - `jominipy/rules/semantics.py`:
+    - `RuleValueSpec`, `RuleFieldConstraint`
+    - `build_field_constraints_by_object(...)`, `load_hoi4_field_constraints(...)`
+    - scalar RHS normalization for primitives (`int`, `float`, `bool`, `scalar`, `localisation*`) and refs (`enum[...]`, `scope[...]`, `value[...]`, `value_set[...]`, `<type>`)
+  - lint rule added:
+    - `SemanticInvalidFieldTypeRule` in `jominipy/lint/rules.py`
+    - diagnostic code: `LINT_SEMANTIC_INVALID_FIELD_TYPE`
+  - tests added/updated:
+    - `tests/test_rules_ingest.py` field-constraint extraction test
+    - `tests/test_lint_typecheck_engines.py` custom-schema type mismatch test
 - Implementation status adjustment:
   - implementation work is now paused
   - current focus is completing the full Phase 0 proposal and gating criteria across docs/memories
@@ -127,6 +138,7 @@ Every agent must perform this checklist before finishing a substantive task:
 - Immediate next step: start Phase 1 execution (lint engine core) under the approved proposal constraints.
 - Immediate next step: replace scaffold rules with CWTools-derived rule IR consumers under the enforced lint/checker contracts.
 - Immediate next step: map `jominipy/rules` normalized IR into lint/type-check rule registries while preserving one parse/facts lifecycle and domain contracts.
+- Immediate next step: expand type validation beyond primitive scalar fields (enum membership, scope refs, type refs, block/tagged constraints) and begin moving hard constraints into typecheck ownership where appropriate.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule from CWTools-derived constraints (required fields/cardinality)

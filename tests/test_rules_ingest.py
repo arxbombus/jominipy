@@ -1,6 +1,9 @@
 from pathlib import Path
 
 from jominipy.rules import (
+    RuleFieldConstraint,
+    RuleValueSpec,
+    build_field_constraints_by_object,
     build_required_fields_by_object,
     load_rules_paths,
     parse_rules_text,
@@ -141,3 +144,43 @@ def test_required_fields_extraction_from_cardinality() -> None:
     required = build_required_fields_by_object(normalized.files[0].statements, include_implicit_required=False)
 
     assert required == {"technology": ("required_field",)}
+
+
+def test_field_constraint_extraction_from_scalar_specs() -> None:
+    source = """technology = {
+    ## cardinality = 1..1
+    required_field = int
+    optional_float = float[0..1]
+    scoped = scope[country]
+    complex = { child = int }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-typed.cwt")
+    file_ir = to_file_ir(parsed)
+    normalized = normalize_ruleset((file_ir,))
+    constraints = build_field_constraints_by_object(
+        normalized.files[0].statements,
+        include_implicit_required=False,
+    )
+
+    expected = {
+        "technology": {
+            "required_field": RuleFieldConstraint(
+                required=True,
+                value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+            ),
+            "optional_float": RuleFieldConstraint(
+                required=False,
+                value_specs=(RuleValueSpec(kind="primitive", raw="float[0..1]", primitive="float", argument="0..1"),),
+            ),
+            "scoped": RuleFieldConstraint(
+                required=False,
+                value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", primitive=None, argument="country"),),
+            ),
+            "complex": RuleFieldConstraint(
+                required=False,
+                value_specs=(RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),),
+            ),
+        }
+    }
+    assert constraints == expected

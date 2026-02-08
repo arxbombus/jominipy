@@ -103,6 +103,7 @@ Status:
 - Next:
   - replace scaffold semantic/style/type rules with CWTools-derived rule IR consumers under enforced rule-domain contracts.
   - consume newly landed read-only rules ingest (`jominipy/rules/*`) instead of ad hoc regex extraction.
+  - expand typed-rule enforcement from primitive scalar checks to enum/scope/type-reference validation.
 
 ## Phase 1 Boundary Contracts (completed)
 - checker rule contracts are enforced mechanically:

@@ -19,7 +19,11 @@ from jominipy.rules.load import (
 from jominipy.rules.parser import parse_rules_file, parse_rules_text, to_file_ir
 from jominipy.rules.result import RulesParseResult
 from jominipy.rules.semantics import (
+    RuleFieldConstraint,
+    RuleValueSpec,
+    build_field_constraints_by_object,
     build_required_fields_by_object,
+    load_hoi4_field_constraints,
     load_hoi4_required_fields,
 )
 
@@ -28,14 +32,18 @@ __all__ = [
     "LoadRulesResult",
     "RuleCardinality",
     "RuleExpression",
+    "RuleFieldConstraint",
     "RuleFileIR",
     "RuleMetadata",
     "RuleOption",
     "RuleScopeReplacement",
     "RuleSetIR",
     "RuleStatement",
+    "RuleValueSpec",
     "RulesParseResult",
+    "build_field_constraints_by_object",
     "build_required_fields_by_object",
+    "load_hoi4_field_constraints",
     "load_hoi4_required_fields",
     "load_rules_directory",
     "load_rules_paths",

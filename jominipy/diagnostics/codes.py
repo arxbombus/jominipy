@@ -93,6 +93,13 @@ LINT_SEMANTIC_MISSING_REQUIRED_FIELD: Final[DiagnosticSpec] = DiagnosticSpec(
     category="lint/semantic",
 )
 
+LINT_SEMANTIC_INVALID_FIELD_TYPE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LINT_SEMANTIC_INVALID_FIELD_TYPE",
+    message="Semantic rule: field value does not match CWTools type constraints.",
+    severity="warning",
+    category="lint/semantic",
+)
+
 LINT_STYLE_SINGLE_LINE_BLOCK: Final[DiagnosticSpec] = DiagnosticSpec(
     code="LINT_STYLE_SINGLE_LINE_BLOCK",
     message="Style rule: multi-value blocks should be split across lines.",
