@@ -1121,45 +1121,99 @@ def _resolve_scope_from_link_candidate(
     alias_memberships_by_family: Mapping[str, frozenset[str]],
     policy: TypecheckPolicy,
 ) -> str | None:
-    if ":" not in candidate:
+    segments = tuple(part.strip() for part in candidate.split(".") if part.strip())
+    if not segments:
         return None
-    prefix_head, value_key = candidate.split(":", 1)
-    prefix = prefix_head.lower() + ":"
-    value_key = value_key.strip()
-    matches = [link for link in link_definitions_by_name.values() if (link.prefix or "").lower() == prefix]
-    if not matches:
-        return None
-    valid_scopes: list[str] = []
-    for link in matches:
-        output_scope = (link.output_scope or "").strip().lower()
-        if not output_scope:
-            continue
-        if not _link_input_scope_allows(link, scope_context=scope_context, policy=policy):
-            continue
-        if not _link_data_source_allows(
-            link,
-            value_key=value_key,
+    active_scopes = set(scope_context.active_scopes)
+    for segment in segments:
+        next_scopes = _resolve_link_segment_scopes(
+            segment=segment,
+            active_scopes=frozenset(active_scopes),
+            link_definitions_by_name=link_definitions_by_name,
             enum_values_by_key=enum_values_by_key,
             known_type_keys=known_type_keys,
             type_memberships_by_key=type_memberships_by_key,
             value_memberships_by_key=value_memberships_by_key,
             alias_memberships_by_family=alias_memberships_by_family,
             policy=policy,
-        ):
-            continue
-        valid_scopes.append(output_scope)
-    if not valid_scopes:
+        )
+        if next_scopes is None:
+            return None
+        active_scopes = set(next_scopes)
+    if not active_scopes:
         return None
-    unique = tuple(sorted(set(valid_scopes)))
+    unique = tuple(sorted(active_scopes))
     if len(unique) != 1:
         return None
     return unique[0]
 
 
+def _resolve_link_segment_scopes(
+    *,
+    segment: str,
+    active_scopes: frozenset[str],
+    link_definitions_by_name: Mapping[str, LinkDefinition],
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
+    policy: TypecheckPolicy,
+) -> tuple[str, ...] | None:
+    valid_scopes: set[str] = set()
+    saw_unresolved = False
+    if ":" in segment:
+        prefix_head, value_key = segment.split(":", 1)
+        prefix = prefix_head.lower() + ":"
+        value_key = value_key.strip()
+        matches = [link for link in link_definitions_by_name.values() if (link.prefix or "").lower() == prefix]
+        if not matches:
+            return None
+        for link in matches:
+            output_scope = (link.output_scope or "").strip().lower()
+            if not output_scope:
+                saw_unresolved = True
+                continue
+            if not _link_input_scope_allows(link, active_scopes=active_scopes, policy=policy):
+                continue
+            if not _link_data_source_allows(
+                link,
+                value_key=value_key,
+                enum_values_by_key=enum_values_by_key,
+                known_type_keys=known_type_keys,
+                type_memberships_by_key=type_memberships_by_key,
+                value_memberships_by_key=value_memberships_by_key,
+                alias_memberships_by_family=alias_memberships_by_family,
+                policy=policy,
+            ):
+                continue
+            valid_scopes.add(output_scope)
+    else:
+        matches = [link for link in link_definitions_by_name.values() if link.name.lower() == segment.lower()]
+        if not matches:
+            return None
+        for link in matches:
+            output_scope = (link.output_scope or "").strip().lower()
+            if not output_scope:
+                saw_unresolved = True
+                continue
+            if link.from_data:
+                saw_unresolved = True
+                continue
+            if not _link_input_scope_allows(link, active_scopes=active_scopes, policy=policy):
+                continue
+            valid_scopes.add(output_scope)
+    if valid_scopes:
+        return tuple(sorted(valid_scopes))
+    if saw_unresolved and policy.unresolved_reference == "defer":
+        return None
+    return None
+
+
 def _link_input_scope_allows(
     link: LinkDefinition,
     *,
-    scope_context: ScopeContext,
+    active_scopes: frozenset[str],
     policy: TypecheckPolicy,
 ) -> bool:
     if not link.input_scopes:
@@ -1167,9 +1221,9 @@ def _link_input_scope_allows(
     normalized = {scope.lower() for scope in link.input_scopes}
     if "any" in normalized:
         return True
-    if not scope_context.active_scopes:
+    if not active_scopes:
         return policy.unresolved_reference == "defer"
-    return bool(set(scope_context.active_scopes).intersection(normalized))
+    return bool(set(active_scopes).intersection(normalized))
 
 
 def _link_data_source_allows(
@@ -1429,6 +1483,8 @@ def _resolve_scope_context_before_path(
         if constraint.push_scope:
             for scope in constraint.push_scope:
                 _apply_push_scope(aliases, scope.lower())
+            # CWTools precedence: when push_scope is present, replace_scope is not applied.
+            continue
         if constraint.replace_scope:
             seen_local: dict[str, str] = {}
             for replacement in constraint.replace_scope:

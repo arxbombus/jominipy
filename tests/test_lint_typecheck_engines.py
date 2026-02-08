@@ -687,6 +687,121 @@ def test_typecheck_scope_ref_link_data_source_unresolved_defer_policy() -> None:
     assert typecheck_result.diagnostics == []
 
 
+def test_typecheck_scope_ref_resolves_multi_segment_link_chain() -> None:
+    source = "technology={ target = owner.capital }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[state]", argument="state"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "owner": LinkDefinition(
+                name="owner",
+                output_scope="country",
+                input_scopes=("state",),
+            ),
+            "capital": LinkDefinition(
+                name="capital",
+                output_scope="state",
+                input_scopes=("country", "state"),
+            ),
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_rejects_multi_segment_link_chain_on_input_scope_mismatch() -> None:
+    source = "technology={ target = owner.capital }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[state]", argument="state"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country",)),
+            }
+        },
+        link_definitions_by_name={
+            "owner": LinkDefinition(
+                name="owner",
+                output_scope="country",
+                input_scopes=("state",),
+            ),
+            "capital": LinkDefinition(
+                name="capital",
+                output_scope="state",
+                input_scopes=("country", "state"),
+            ),
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_scope_ref_resolves_chain_with_prefixed_link_segment() -> None:
+    source = "technology={ target = owner.var:foo }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "owner": LinkDefinition(
+                name="owner",
+                output_scope="country",
+                input_scopes=("state",),
+            ),
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("country",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="both",
+            ),
+        },
+        value_memberships_by_key={"variable": frozenset({"foo"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
 def test_typecheck_localisation_command_scope_allows_matching_scope() -> None:
     source = 'technology={ desc = "[ROOT.GetWing]" }\n'
     custom_rule = LocalisationCommandScopeRule(
@@ -1139,6 +1254,83 @@ def test_typecheck_scope_ref_reports_ambiguous_replace_scope_alias_mapping() -> 
     assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
         "TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT"
     ]
+
+
+def test_typecheck_scope_ref_push_scope_takes_precedence_over_replace_scope_same_path() -> None:
+    source = "technology={ who = from }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "planet", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(
+                    push_scope=("country", "state"),
+                    replace_scope=(RuleScopeReplacement(source="from", target="planet"),),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_push_scope_precedence_ignores_replace_scope_override() -> None:
+    source = "technology={ who = from }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[planet]", argument="planet"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "planet", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(
+                    push_scope=("country", "state"),
+                    replace_scope=(RuleScopeReplacement(source="from", target="planet"),),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_scope_context_push_scope_precedence_skips_replace_scope_ambiguity() -> None:
+    source = "technology={ who = TAG }\n"
+    custom_rule = FieldScopeContextRule(
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(
+                    push_scope=("country",),
+                    replace_scope=(
+                        RuleScopeReplacement(source="from", target="country"),
+                        RuleScopeReplacement(source="from", target="state"),
+                    ),
+                ),
+                ("who",): RuleFieldScopeConstraint(required_scope=("country",)),
+            }
+        }
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
 
 
 def test_typecheck_scope_context_reports_ambiguous_replace_scope_alias_mapping() -> None:
