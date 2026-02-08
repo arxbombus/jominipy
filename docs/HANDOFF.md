@@ -40,7 +40,7 @@ Every agent must perform this checklist before finishing a substantive task:
   2. subtype gating/materialization + conditional rule application
   3. complex enum derivation pipeline
   4. special-file semantic providers (`links`, `modifiers`, `values`, `localisation`) and checker wiring
-  5. remaining option-surface parity (`comparison`, `error_if_only_match`, reference labels)
+  5. localisation Stage 2: YAML localisation key existence/coverage indexing + checker wiring
 - Core invariants remain required:
   - one parse/facts lifecycle (`JominiParseResult`)
   - lint/typecheck boundary contracts
@@ -55,8 +55,8 @@ Every agent must perform this checklist before finishing a substantive task:
   - alias/single-alias execution semantics are now partially implemented (`single_alias_right` expansion + `alias_match_left` membership), but not end-to-end
   - subtype execution semantics are now partially implemented (deterministic subtype matcher gating), but not full CWTools parity
   - complex enum generation is now initially implemented (path/name-tree/start_from_root materialization), but not fully parity-hardened
-  - special-file semantics are now partially integrated (`scopes` + `values` + `links` + initial `modifiers`/`localisation_commands` providers + initial localisation command/scope enforcement); deeper link-chain and advanced localisation parity remain
-  - non-core option semantics (`comparison`, `error_if_only_match`, reference labels) not wired
+  - special-file semantics are now partially integrated (`scopes` + `values` + `links` + initial `modifiers`/`localisation_commands` providers + localisation command/scope enforcement + advanced links chain semantics); advanced localisation parity remains
+  - non-core option semantics (`comparison`, `error_if_only_match`, reference labels) are now wired
   - localisation parity remains pending and should be staged:
     - command/scope semantics from `localisation.cwt` first,
     - localisation YAML key-existence/coverage validation second.
@@ -188,14 +188,39 @@ Every agent must perform this checklist before finishing a substantive task:
   - `localisation_commands` provider extraction and service wiring,
   - deeper `links` `from_data + data_source` membership gating in scope-ref resolution.
 - Update (current): localisation command/scope semantic enforcement is now landed in typecheck for localisation-typed fields.
-- Immediate next step: option-surface parity (`comparison`, `error_if_only_match`, reference labels).
-- Immediate follow-up: deeper `links` advanced-chain semantics, then strict precedence compatibility review for `push_scope`/`replace_scope`.
+- Update (current): option-surface parity is now landed (`comparison`, `error_if_only_match`, reference labels), including `TYPECHECK_RULE_CUSTOM_ERROR` execution wiring.
+- Update (current): deeper `links` advanced-chain semantics are now landed (multi-segment + mixed prefixed segments with per-segment input/data-source gating).
+- Update (current): strict `push_scope`/`replace_scope` precedence compatibility is now landed (CWTools precedence: same-path `push_scope` wins; `replace_scope` skipped).
+- Immediate next step: localisation Stage 2 (YAML key existence/coverage indexing and semantic validation wiring).
+- Localisation Stage 2 implementation blueprint (approved evaluation):
+  - Reuse parser pipeline architecture (lexer/buffered lexer/token source/event parser/tree sink) with a dedicated localisation grammar module, not rules/Jomini grammar reuse.
+  - Keep implementation scope to lossless parse artifacts + index/facts; do not build red wrappers/AST unless later features require it.
+  - Critical syntax reality to handle:
+    - Paradox loc accepts `key:version "value"` forms (e.g. `md4.1.t:0 "..."`).
+    - Real-world loc files may contain unescaped inner double quotes inside outer quoted values.
+  - Verified current lexer behavior on this edge:
+    - unescaped inner quotes split into multiple tokens and produce `LEXER_UNTERMINATED_STRING`. (we previous had an option `allow_multiline_strings` in our lexer that remains unused, we should change it to `allow_unterminated_strings` and use that in `_lex_string()` to allow unterminated. We have to be careful with this as loc strings still must begin and end with quotes, either double or single, just like in proper yaml -> all locs are strings and must begin and end with quotes. I don't even know if our lexer can handle single quotes. We definitely need to be careful with this)
+    - therefore localisation grammar must not depend on strict `STRING` token correctness for value payload capture.
+  - Recommended adaptation (next agent implementation plan):
+    1. Add localisation parser mode/entrypoint and grammar (`parse_localisation_*`) while keeping existing Jomini parse path untouched.
+    2. Parse header (`l_<locale>:`) and entry prefix (`key:version`) with normal tokens.
+    3. Capture value payload from original source slice to end-of-line (range-based), not by trusting strict `STRING` tokenization.
+    4. Record symbol spans for key/version/locale and retain trivia/comments losslessly.
+    5. Build localisation key index service from parsed entries (duplicate-key detection + coverage queries).
+    6. Wire Stage 2 checks in typecheck/lint:
+       - required localisation key existence from rules/type templates,
+       - localisation reference coverage against indexed keys,
+       - policy-driven severity for unresolved/missing keys.
 - Drift correction note:
   - During subtype rollout, subtype constraints were briefly merged unconditionally into base constraints in the adapter.
   - This was corrected in the same iteration; subtype constraints now apply only through per-object-occurrence matcher resolution in typecheck.
 - Latest validation snapshot (post-links-data-source + provider pass 2):
   - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`68 passed`)
   - `uv run ruff check jominipy/typecheck/rules.py jominipy/typecheck/services.py jominipy/rules/adapter.py jominipy/rules/__init__.py jominipy/rules/normalize.py tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (passed)
+  - `uv run pyrefly check` (`0 errors`, `1 suppressed`)
+- Latest validation snapshot (post option-surface + advanced-links + precedence passes):
+  - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`76 passed`)
+  - `uv run ruff check tests jominipy docs` (passed)
   - `uv run pyrefly check` (`0 errors`, `1 suppressed`)
 - Latest validation snapshot (post-alias/subtype/complex-enum phases):
   - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`60 passed`)

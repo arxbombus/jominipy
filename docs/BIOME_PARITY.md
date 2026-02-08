@@ -83,6 +83,15 @@ For every parser/CST/AST feature, record:
   - update (2026-02-08): localisation parity model clarified:
     - CWTools uses runtime callback/service validation (`processLocalisation`/`validateLocalisation`),
     - jominipy keeps Biome-style staged artifacts (adapter extraction + service injection), with YAML content indexing as a later layer.
+  - update (2026-02-08): option-surface parity pass landed:
+    - normalized metadata now captures `comparison`, `error_if_only_match`, and incoming/outgoing reference labels,
+    - typecheck now executes `error_if_only_match` as a deterministic correctness diagnostic (`TYPECHECK_RULE_CUSTOM_ERROR`).
+  - update (2026-02-08): links advanced-chain parity pass landed:
+    - scope-link resolution now supports multi-segment chains (`a.b.c`) and mixed prefixed segments (`owner.var:foo`),
+    - each segment enforces input-scope gating and `from_data + data_source` membership rules.
+  - update (2026-02-08): strict scope precedence compatibility landed:
+    - when a declaration has both `push_scope` and `replace_scope`, typecheck now applies CWTools precedence (`push_scope` wins; same-path `replace_scope` skipped),
+    - precedence behavior is locked by explicit regression tests.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

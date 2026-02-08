@@ -153,11 +153,13 @@ Phase 1.1 progress:
 - Completed (initial): Phase 5 special-file provider pass 1 (`values` memberships + `links` definitions wired into scope-ref checks).
 - Completed (initial): Phase 5 special-file provider pass 2 (`modifiers`/`modifier_categories` + `localisation_commands` provider extraction wired into typecheck services; `links` `from_data` now enforces `data_source` membership in scope-ref resolution).
 - Completed (initial): Phase 5 localisation command/scope semantic enforcement in typecheck for localisation-typed fields.
+- Completed: deeper links advanced-chain semantics (multi-segment chains and mixed prefixed segments with per-segment input/data-source gating).
+- Completed: Phase 6 option-surface parity (`comparison`, `error_if_only_match`, reference labels) with deterministic typecheck execution for `error_if_only_match`.
+- Completed: strict compatibility precedence for same-path `push_scope` + `replace_scope` (CWTools precedence: `push_scope` wins; same-path `replace_scope` skipped).
 - Next:
-  - execute remaining Phase 5 special-file semantic enforcement work (deeper links chain semantics), then Phase 6 option parity.
   - localisation sequencing requirement:
     1. command/scope semantics from `localisation.cwt` providers first (landed)
-    2. localisation YAML key existence/coverage indexing second
+    2. localisation YAML key existence/coverage indexing second (next execution slice)
   - harden parity edge cases for alias/subtype/complex-enum semantics against CWTools behavior (`type_key_filter`, `starts_with`, subtype `push_scope`, complex enum edge-path semantics).
   - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 

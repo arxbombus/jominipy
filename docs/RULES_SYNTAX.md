@@ -71,9 +71,9 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] initial `localisation_commands` provider extraction and service wiring.
   - [x] deeper `links` pass: `from_data + data_source` membership gating in scope-ref resolution.
   - [x] initial localisation command/scope compatibility enforcement in typecheck from `localisation_commands`.
-  - [ ] deeper `links` advanced-chain semantics beyond current prefix+input+output+data-source checks.
-- [ ] Option-surface parity for non-core options used by CWTools execution (`comparison`, `error_if_only_match`, reference labels).
-- [ ] Compatibility decision for strict CWTools `push_scope`/`replace_scope` precedence behavior.
+  - [x] deeper `links` advanced-chain semantics (multi-segment chain resolution with per-segment input-scope and data-source gating).
+- [x] Option-surface parity for non-core options used by CWTools execution (`comparison`, `error_if_only_match`, reference labels).
+- [x] Compatibility decision for strict CWTools `push_scope`/`replace_scope` precedence behavior (`push_scope` takes precedence at same declaration path; `replace_scope` is skipped there).
 
 ### Confirmed current behavior differences to track
 - `replace_scope` parsing:
@@ -82,6 +82,9 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - `push_scope` model:
   - CWTools uses singular `pushScope`.
   - jominipy currently stores list-form `push_scope` and composes transitions generically.
+- `push_scope`/`replace_scope` precedence:
+  - CWTools applies `pushScope` branch before `replaceScopes` and does not combine both on the same declaration.
+  - jominipy now mirrors this precedence in scope-context resolution.
 - Ambiguity diagnostics:
   - jominipy emits `TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT` for conflicting replace mappings.
   - CWTools behavior here is less explicit; keep this as intentional hardening unless strict-compat mode requires otherwise.
