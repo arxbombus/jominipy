@@ -20,12 +20,13 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [x] Typecheck-owned primitive field constraint checks (migrated from lint) using CWTools-derived constraints.
 - [x] Primitive range enforcement for numeric primitives (`int[min..max]`, `float[min..max]`) in typecheck.
 - [x] Initial additional primitive-family checks in typecheck (`date_field`, `percentage_field`, `variable_field`, `int_variable_field`, `value_field`, `int_value_field`).
+- [x] Registry-backed `filepath[...]` and `icon[...]` checks in typecheck via pluggable asset registry contract (deferred/unknown when no registry is configured).
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
   - [x] Primitive scalar type checks for `int`/`float`/`bool` (historical; now owned by typecheck for correctness).
 
 ### Not implemented yet (pending)
-- [ ] Strict handling for remaining primitive families (`filepath`, `icon`, and stricter variable/value reference semantics).
+- [ ] Strict handling for remaining primitive-family semantics (tighter variable/value reference semantics and project-policy decisions for unresolved asset lookups).
 - [ ] Enum membership resolution and validation (`enum[key]` -> concrete allowed values).
 - [ ] Type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms).
 - [ ] Scope-resolution checks (`scope[...]`, scope stack transitions from `push_scope`/`replace_scope`).
@@ -35,6 +36,14 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
 - [ ] Full schema graph wiring into resolved correctness checks (enum/type/scope/value validation in typecheck).
 - [ ] Complete migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
+
+### HOI4 icon resolution note
+- In HOI4 rules, many gameplay `icon` fields (for example in `common/national_focus/*.txt`) are typed as `<spriteType>` in `references/hoi4-rules/Config/common/national_focus.cwt`.
+- `spriteType` is defined in `references/hoi4-rules/Config/interface/gfx.cwt`, and its `texturefile` members map to file-backed paths.
+- Practical validation chain for these fields is:
+  - `filepath` checks validate concrete file existence (for example, texture files),
+  - `<spriteType>` checks validate icon-name membership in discovered sprite type definitions,
+  - gameplay `icon = ...` fields should primarily validate through type-reference resolution (`<spriteType>`), with file existence validated on the sprite definitions.
 
 ##### Table of Contents  
 - [Basic structure](#basic-structure)

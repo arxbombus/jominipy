@@ -62,6 +62,8 @@ For every parser/CST/AST feature, record:
   - update (2026-02-08): cross-file schema graph foundation is implemented and consumed by HOI4 semantic loaders.
   - update (2026-02-08): nested analysis facts for object fields are implemented in shared facts cache (`jominipy/analysis/facts.py`) for deterministic field-level rule execution.
   - update (2026-02-08): primitive field-type/range correctness moved into typecheck (`TYPECHECK_INVALID_FIELD_TYPE`), keeping lint focused on policy/style concerns.
+  - update (2026-02-08): registry-backed asset lookup contract added for typecheck (`jominipy/typecheck/assets.py`), mirroring Biome-style shared-service injection patterns while keeping one parse/facts lifecycle.
+  - update (2026-02-08): HOI4 icon correctness is now documented as primarily type-reference resolution (`<spriteType>` from `interface/gfx.cwt`) with texture file existence validated on sprite definitions, not direct icon filename path checks alone.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

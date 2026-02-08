@@ -33,8 +33,8 @@ Every agent must perform this checklist before finishing a substantive task:
 - Active workstream: CWTools rules ingest -> normalized IR -> typed semantic enforcement.
 - Current sequencing source of truth: `docs/RULES_SYNTAX.md` -> `Implementation Checklist (jominipy status)`.
 - Immediate implementation order:
-  1. finish strict remaining primitive families in typecheck (`filepath`/`icon` and tighter variable/value reference semantics)
-  2. implement resolved reference correctness (`enum[...]`, `<type_key>`, `scope[...]`)
+  1. finish strict remaining primitive-family semantics in typecheck (tighter variable/value reference semantics and unresolved-asset policy)
+  2. implement resolved reference correctness (`enum[...]`, `<type_key>`, `scope[...]`) with first-class `<spriteType>` coverage for HOI4 `icon` fields
   3. wire advanced semantics (alias/single-alias/subtype/special files)
 - Core invariants remain required:
   - one parse/facts lifecycle (`JominiParseResult`)
@@ -154,8 +154,9 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase A (cross-file schema graph/index foundation) is now landed.
 - Phase 1.1 Phase B (nested analysis facts for object fields) is now landed.
 - Phase 1.1 Phase C (initial primitive/range correctness in typecheck + field-type correctness migration out of lint) is now landed.
-- Immediate next step: complete stricter remaining primitive-family checks (`filepath`/`icon`, tighter variable/value references).
-- Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph and field-fact indexes.
+- Phase 1.1 Phase C extension (registry-backed `filepath`/`icon` checks via `AssetRegistry`) is now landed.
+- Immediate next step: complete stricter remaining primitive-family semantics (tighter variable/value references and unresolved-asset policy choices).
+- Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph and field-fact indexes, prioritizing `<spriteType>` membership checks for gameplay icons.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule from CWTools-derived constraints (required fields/cardinality)

@@ -24,6 +24,11 @@ from jominipy.rules.semantics import (
     load_hoi4_field_constraints,
 )
 from jominipy.text import TextRange, TextSize
+from jominipy.typecheck.assets import (
+    AssetLookupStatus,
+    AssetRegistry,
+    NullAssetRegistry,
+)
 
 type TypecheckDomain = Literal["correctness"]
 type TypecheckConfidence = Literal["sound"]
@@ -91,6 +96,7 @@ class FieldConstraintRule:
     domain: TypecheckDomain = "correctness"
     confidence: TypecheckConfidence = "sound"
     field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
+    asset_registry: AssetRegistry = NullAssetRegistry()
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
         constraints = self.field_constraints_by_object
@@ -108,7 +114,11 @@ class FieldConstraintRule:
                 if not field_facts:
                     continue
                 for field_fact in field_facts:
-                    if _matches_field_constraint(field_fact.value, constraint):
+                    if _matches_field_constraint(
+                        field_fact.value,
+                        constraint,
+                        asset_registry=self.asset_registry,
+                    ):
                         continue
                     diagnostics.append(
                         Diagnostic(
@@ -175,13 +185,23 @@ def _find_key_occurrence_range(text: str, key: str, occurrence: int) -> TextRang
     return TextRange.at(TextSize(index), TextSize(len(key)))
 
 
-def _matches_field_constraint(value: object | None, constraint: RuleFieldConstraint) -> bool:
+def _matches_field_constraint(
+    value: object | None,
+    constraint: RuleFieldConstraint,
+    *,
+    asset_registry: AssetRegistry,
+) -> bool:
     if not constraint.value_specs:
         return True
-    return any(_matches_value_spec(value, spec) for spec in constraint.value_specs)
+    return any(_matches_value_spec(value, spec, asset_registry=asset_registry) for spec in constraint.value_specs)
 
 
-def _matches_value_spec(value: object | None, spec: RuleValueSpec) -> bool:
+def _matches_value_spec(
+    value: object | None,
+    spec: RuleValueSpec,
+    *,
+    asset_registry: AssetRegistry,
+) -> bool:
     if spec.kind in {"missing", "unknown_ref", "enum_ref", "scope_ref", "value_ref", "value_set_ref", "type_ref"}:
         return True
     if spec.kind == "block":
@@ -197,10 +217,21 @@ def _matches_value_spec(value: object | None, spec: RuleValueSpec) -> bool:
     primitive = spec.primitive
     if primitive is None:
         return True
-    return _matches_primitive(value=value, primitive=primitive, argument=spec.argument)
+    return _matches_primitive(
+        value=value,
+        primitive=primitive,
+        argument=spec.argument,
+        asset_registry=asset_registry,
+    )
 
 
-def _matches_primitive(*, value: AstScalar, primitive: str, argument: str | None) -> bool:
+def _matches_primitive(
+    *,
+    value: AstScalar,
+    primitive: str,
+    argument: str | None,
+    asset_registry: AssetRegistry,
+) -> bool:
     parsed = interpret_scalar(value.raw_text, was_quoted=value.was_quoted)
     number_value = parsed.number_value
 
@@ -224,7 +255,14 @@ def _matches_primitive(*, value: AstScalar, primitive: str, argument: str | None
     if primitive in {"int_variable_field", "int_value_field"}:
         return _matches_numeric_or_reference(value.raw_text, number_value, argument=argument, require_int=True)
     if primitive in {"filepath", "icon", "scope_field"}:
-        return True
+        if primitive == "scope_field":
+            return True
+        return _matches_asset_primitive(
+            raw_text=value.raw_text,
+            primitive=primitive,
+            argument=argument,
+            asset_registry=asset_registry,
+        )
     return True
 
 
@@ -254,6 +292,65 @@ def _matches_numeric_or_reference(
             return True
         return _in_range(float(number_value), bounds)
     return _VARIABLE_REF_PATTERN.fullmatch(raw_text.strip()) is not None
+
+
+def _matches_asset_primitive(
+    *,
+    raw_text: str,
+    primitive: str,
+    argument: str | None,
+    asset_registry: AssetRegistry,
+) -> bool:
+    raw_value = _strip_scalar_quotes(raw_text)
+    if not raw_value:
+        return False
+
+    if primitive == "filepath":
+        candidate = _build_filepath_candidate(raw_value=raw_value, argument=argument)
+    elif primitive == "icon":
+        candidate = _build_icon_candidate(raw_value=raw_value, argument=argument)
+    else:
+        return True
+
+    if not candidate:
+        return False
+
+    lookup = asset_registry.lookup(candidate)
+    if lookup.status == AssetLookupStatus.UNKNOWN:
+        # No project registry configured: skip hard decision for now.
+        return True
+    return lookup.status == AssetLookupStatus.FOUND
+
+
+def _build_filepath_candidate(*, raw_value: str, argument: str | None) -> str:
+    if argument is None:
+        return raw_value
+
+    spec = argument.strip()
+    if not spec:
+        return raw_value
+
+    prefix = spec
+    extension = ""
+    if "," in spec:
+        prefix, extension = (part.strip() for part in spec.split(",", 1))
+    return f"{prefix}{raw_value}{extension}"
+
+
+def _build_icon_candidate(*, raw_value: str, argument: str | None) -> str:
+    if argument is None:
+        return f"{raw_value}.dds"
+    prefix = argument.strip().rstrip("/")
+    if not prefix:
+        return f"{raw_value}.dds"
+    return f"{prefix}/{raw_value}.dds"
+
+
+def _strip_scalar_quotes(raw_text: str) -> str:
+    stripped = raw_text.strip()
+    if len(stripped) >= 2 and stripped[0] == '"' and stripped[-1] == '"':
+        return stripped[1:-1]
+    return stripped
 
 
 def _parse_range_argument(argument: str | None) -> tuple[float | None, float | None] | None:
