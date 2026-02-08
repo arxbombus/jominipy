@@ -10,10 +10,12 @@ from jominipy.lint.rules import (
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
 from jominipy.rules import RuleFieldConstraint, RuleValueSpec
+from jominipy.rules.semantics import RuleFieldScopeConstraint
 from jominipy.typecheck.assets import SetAssetRegistry
 from jominipy.typecheck.rules import (
     FieldConstraintRule,
     FieldReferenceConstraintRule,
+    FieldScopeContextRule,
     TypecheckFacts,
     TypecheckRule,
     default_typecheck_rules,
@@ -434,6 +436,55 @@ def test_typecheck_field_reference_rule_uses_dynamic_value_set_capture() -> None
     # `has_key = beta` should fail while `has_key = alpha` should pass.
     assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
         "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_value_set_ref_does_not_require_prior_membership() -> None:
+    source = "technology={ set_key = alpha }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "set_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="value_set_ref", raw="value_set[test_key]", argument="test_key"),),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_context_rule_uses_push_scope_for_nested_fields() -> None:
+    source = "technology={ wrapper={ target = TAG } }\n"
+    custom_rule = FieldScopeContextRule(
+        field_scope_constraints_by_object={
+            "technology": {
+                ("wrapper",): RuleFieldScopeConstraint(push_scope=("country",)),
+                ("wrapper", "target"): RuleFieldScopeConstraint(required_scope=("country",)),
+            }
+        }
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_context_rule_reports_missing_scope_transition() -> None:
+    source = "technology={ wrapper={ target = TAG } }\n"
+    custom_rule = FieldScopeContextRule(
+        field_scope_constraints_by_object={
+            "technology": {
+                ("wrapper", "target"): RuleFieldScopeConstraint(required_scope=("country",)),
+            }
+        }
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_SCOPE_CONTEXT"
     ]
 
 

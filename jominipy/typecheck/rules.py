@@ -18,13 +18,16 @@ from jominipy.diagnostics import (
     TYPECHECK_INCONSISTENT_VALUE_SHAPE,
     TYPECHECK_INVALID_FIELD_REFERENCE,
     TYPECHECK_INVALID_FIELD_TYPE,
+    TYPECHECK_INVALID_SCOPE_CONTEXT,
     Diagnostic,
 )
 from jominipy.rules.semantics import (
     RuleFieldConstraint,
+    RuleFieldScopeConstraint,
     RuleValueSpec,
     load_hoi4_enum_values,
     load_hoi4_field_constraints,
+    load_hoi4_field_scope_constraints,
     load_hoi4_known_scopes,
     load_hoi4_type_keys,
 )
@@ -240,6 +243,51 @@ class FieldReferenceConstraintRule:
         return diagnostics
 
 
+@dataclass(frozen=True, slots=True)
+class FieldScopeContextRule:
+    """Checks field declarations against scope context transitions from CWTools metadata."""
+
+    code: str = TYPECHECK_INVALID_SCOPE_CONTEXT.code
+    name: str = "fieldScopeContext"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        scope_constraints = self.field_scope_constraints_by_object
+        if scope_constraints is None:
+            scope_constraints = load_hoi4_field_scope_constraints()
+
+        diagnostics: list[Diagnostic] = []
+        for field_fact in facts.all_field_facts:
+            by_object = scope_constraints.get(field_fact.object_key)
+            if not by_object:
+                continue
+            relative_path = field_fact.path[1:]
+            declaration_constraint = by_object.get(relative_path)
+            if declaration_constraint is None or declaration_constraint.required_scope is None:
+                continue
+
+            active_scopes = _resolve_active_scopes_before_path(relative_path=relative_path, by_path=by_object)
+            required = set(scope.lower() for scope in declaration_constraint.required_scope)
+            if active_scopes and required.intersection(active_scopes):
+                continue
+            diagnostics.append(
+                Diagnostic(
+                    code=self.code,
+                    message=(
+                        f"{TYPECHECK_INVALID_SCOPE_CONTEXT.message} "
+                        f"`{'.'.join(relative_path)}` requires scope {', '.join(declaration_constraint.required_scope)}."
+                    ),
+                    range=_find_key_occurrence_range(text, field_fact.object_key, field_fact.object_occurrence),
+                    severity=TYPECHECK_INVALID_SCOPE_CONTEXT.severity,
+                    hint="Adjust surrounding scope transitions (push_scope/replace_scope) or move this field.",
+                    category=TYPECHECK_INVALID_SCOPE_CONTEXT.category,
+                )
+            )
+        return diagnostics
+
+
 def build_typecheck_facts(facts: AnalysisFacts) -> TypecheckFacts:
     inconsistent: dict[str, tuple[str, ...]] = {}
     for key, shapes in facts.top_level_shapes.items():
@@ -262,6 +310,7 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             known_scopes=resolved_services.known_scopes,
             policy=resolved_services.policy,
         ),
+        FieldScopeContextRule(),
     ]
     return tuple(sorted(rules, key=lambda rule: (rule.code, rule.name)))
 
@@ -533,7 +582,11 @@ def _matches_reference_spec(
             return policy.unresolved_reference == "defer"
         return raw.strip().lower() == key.lower()
 
-    if spec.kind in {"value_ref", "value_set_ref"}:
+    if spec.kind == "value_set_ref":
+        # Setter declarations register values; they do not require prior membership.
+        return True
+
+    if spec.kind == "value_ref":
         if not key:
             return policy.unresolved_reference == "defer"
         members = value_memberships_by_key.get(key)
@@ -650,3 +703,27 @@ def _merge_membership_maps(
     for key, values in right.items():
         merged.setdefault(key, set()).update(values)
     return {key: frozenset(values) for key, values in merged.items()}
+
+
+def _resolve_active_scopes_before_path(
+    *,
+    relative_path: tuple[str, ...],
+    by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
+) -> set[str]:
+    aliases: dict[str, str] = {}
+    scope_stack: list[str] = []
+    path_prefixes: list[tuple[str, ...]] = [()]
+    for i in range(1, len(relative_path)):
+        path_prefixes.append(relative_path[:i])
+
+    for prefix in path_prefixes:
+        constraint = by_path.get(prefix)
+        if constraint is None:
+            continue
+        if constraint.push_scope:
+            for scope in constraint.push_scope:
+                scope_stack.append(scope.lower())
+        if constraint.replace_scope:
+            for replacement in constraint.replace_scope:
+                aliases[replacement.source.lower()] = replacement.target.lower()
+    return set(scope_stack) | set(aliases.values())

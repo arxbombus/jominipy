@@ -93,6 +93,13 @@ TYPECHECK_INVALID_FIELD_REFERENCE: Final[DiagnosticSpec] = DiagnosticSpec(
     category="typecheck",
 )
 
+TYPECHECK_INVALID_SCOPE_CONTEXT: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="TYPECHECK_INVALID_SCOPE_CONTEXT",
+    message="Field is used outside allowed CWTools scope context.",
+    severity="warning",
+    category="typecheck",
+)
+
 LINT_SEMANTIC_INCONSISTENT_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
     code="LINT_SEMANTIC_INCONSISTENT_SHAPE",
     message="Semantic rule: mixed value shapes should be normalized.",

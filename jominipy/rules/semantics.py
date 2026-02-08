@@ -7,7 +7,12 @@ from functools import lru_cache
 import re
 from typing import Literal
 
-from jominipy.rules.ir import RuleExpression, RuleMetadata, RuleStatement
+from jominipy.rules.ir import (
+    RuleExpression,
+    RuleMetadata,
+    RuleScopeReplacement,
+    RuleStatement,
+)
 from jominipy.rules.schema_graph import load_hoi4_schema_graph
 
 _SIMPLE_FIELD_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -41,6 +46,13 @@ class RuleValueSpec:
 class RuleFieldConstraint:
     required: bool
     value_specs: tuple[RuleValueSpec, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RuleFieldScopeConstraint:
+    required_scope: tuple[str, ...] | None = None
+    push_scope: tuple[str, ...] | None = None
+    replace_scope: tuple[RuleScopeReplacement, ...] | None = None
 
 
 def build_required_fields_by_object(
@@ -114,6 +126,28 @@ def build_field_constraints_by_object(
     return result
 
 
+def build_field_scope_constraints_by_object(
+    statements: tuple[RuleStatement, ...],
+) -> dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]]:
+    """Extract object->field-path scope constraints from normalized rules statements."""
+    result: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] = {}
+    for statement in statements:
+        if statement.key is None or statement.value.kind != "block":
+            continue
+        object_constraints: dict[tuple[str, ...], RuleFieldScopeConstraint] = {}
+        _collect_scope_constraints(
+            statement.value.block,
+            path=(),
+            output=object_constraints,
+        )
+        top_scope = _to_scope_constraint(statement.metadata)
+        if top_scope is not None:
+            object_constraints[()] = top_scope
+        if object_constraints:
+            result[statement.key] = object_constraints
+    return result
+
+
 def _is_required(metadata: RuleMetadata, *, include_implicit_required: bool) -> bool:
     cardinality = metadata.cardinality
     if cardinality is not None:
@@ -123,6 +157,33 @@ def _is_required(metadata: RuleMetadata, *, include_implicit_required: bool) -> 
             return True
         return False
     return include_implicit_required
+
+
+def _to_scope_constraint(metadata: RuleMetadata) -> RuleFieldScopeConstraint | None:
+    if metadata.scope is None and metadata.push_scope is None and metadata.replace_scope is None:
+        return None
+    return RuleFieldScopeConstraint(
+        required_scope=metadata.scope,
+        push_scope=metadata.push_scope,
+        replace_scope=metadata.replace_scope,
+    )
+
+
+def _collect_scope_constraints(
+    statements: tuple[RuleStatement, ...],
+    *,
+    path: tuple[str, ...],
+    output: dict[tuple[str, ...], RuleFieldScopeConstraint],
+) -> None:
+    for statement in statements:
+        if statement.kind != "key_value" or statement.key is None:
+            continue
+        child_path = (*path, statement.key)
+        scope_constraint = _to_scope_constraint(statement.metadata)
+        if scope_constraint is not None:
+            output[child_path] = scope_constraint
+        if statement.value.kind == "block":
+            _collect_scope_constraints(statement.value.block, path=child_path, output=output)
 
 
 def _extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...]:
@@ -261,6 +322,15 @@ def load_hoi4_type_keys() -> frozenset[str]:
     """Load known type keys declared by HOI4 schema graph."""
     schema = load_hoi4_schema_graph()
     return frozenset(schema.types_by_key.keys())
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_field_scope_constraints() -> dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]]:
+    """Load per-object field-path scope constraints from HOI4 cross-file schema."""
+    schema = load_hoi4_schema_graph()
+    if not schema.top_level_rule_statements:
+        return {}
+    return build_field_scope_constraints_by_object(schema.top_level_rule_statements)
 
 
 @lru_cache(maxsize=1)

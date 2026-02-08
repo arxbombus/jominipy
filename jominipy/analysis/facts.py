@@ -64,9 +64,11 @@ def build_analysis_facts(source_file: AstSourceFile) -> AnalysisFacts:
         )
         if not field_facts:
             continue
-        object_fields.setdefault(key, []).extend(field_facts)
+        immediate_field_facts = tuple(fact for fact in field_facts if len(fact.path) == 2)
+        if immediate_field_facts:
+            object_fields.setdefault(key, []).extend(immediate_field_facts)
         grouped = object_field_groups.setdefault(key, {})
-        for field_fact in field_facts:
+        for field_fact in immediate_field_facts:
             grouped.setdefault(field_fact.field_key, []).append(field_fact)
         all_field_facts.extend(field_facts)
 
@@ -110,23 +112,47 @@ def _extract_object_field_facts(
         return ()
     if not value.is_object_like:
         return ()
+    return _collect_field_facts_recursive(
+        object_key=object_key,
+        object_occurrence=object_occurrence,
+        block=value,
+        parent_path=(object_key,),
+    )
 
+
+def _collect_field_facts_recursive(
+    *,
+    object_key: str,
+    object_occurrence: int,
+    block: AstBlock,
+    parent_path: tuple[str, ...],
+) -> tuple[FieldFact, ...]:
     field_occurrences: dict[str, int] = {}
     field_facts: list[FieldFact] = []
-    for statement in value.statements:
+    for statement in block.statements:
         if not isinstance(statement, AstKeyValue):
             continue
         field_key = statement.key.raw_text
         field_occurrence = field_occurrences.get(field_key, 0)
         field_occurrences[field_key] = field_occurrence + 1
+        current_path = (*parent_path, field_key)
         field_facts.append(
             FieldFact(
                 object_key=object_key,
                 field_key=field_key,
-                path=(object_key, field_key),
+                path=current_path,
                 value=statement.value,
                 object_occurrence=object_occurrence,
                 field_occurrence=field_occurrence,
             )
         )
+        if isinstance(statement.value, AstBlock) and statement.value.is_object_like:
+            field_facts.extend(
+                _collect_field_facts_recursive(
+                    object_key=object_key,
+                    object_occurrence=object_occurrence,
+                    block=statement.value,
+                    parent_path=current_path,
+                )
+            )
     return tuple(field_facts)
