@@ -5,6 +5,8 @@ from jominipy.rules import (
     RuleSchemaGraph,
     RuleValueSpec,
     build_alias_members_by_family,
+    build_complex_enum_definitions,
+    build_complex_enum_values_from_file_texts,
     build_expanded_field_constraints,
     build_field_constraints_by_object,
     build_required_fields_by_object,
@@ -311,3 +313,56 @@ def test_subtype_field_constraints_are_extracted_from_object_rules() -> None:
         required=False,
         value_specs=(RuleValueSpec(kind="primitive", raw="float", primitive="float", argument=None),),
     )
+
+
+def test_complex_enum_values_materialize_from_project_files() -> None:
+    rules_source = """enums = {
+    complex_enum[event_chain_counter] = {
+        path = "common/event_chains"
+        name = {
+            counter = {
+                enum_name = { }
+            }
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(rules_source, source_path="inline-complex-enum.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path={
+            "common/event_chains/sample.txt": "my_chain={ counter={ chain_counter = 1 } }\n",
+        },
+        definitions_by_key=definitions,
+    )
+    assert values["event_chain_counter"] == frozenset({"chain_counter"})
+
+
+def test_complex_enum_start_from_root_walks_top_level_children() -> None:
+    rules_source = """enums = {
+    complex_enum[root_keys] = {
+        path = "common/event_chains"
+        start_from_root = yes
+        name = {
+            enum_name = { }
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(rules_source, source_path="inline-complex-enum-root.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path={
+            "common/event_chains/sample.txt": "alpha={}\nbeta={}\n",
+        },
+        definitions_by_key=definitions,
+    )
+    assert values["root_keys"] == frozenset({"alpha", "beta"})

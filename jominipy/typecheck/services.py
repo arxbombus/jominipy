@@ -34,6 +34,9 @@ class TypecheckServices:
         default_factory=lambda: MappingProxyType({})
     )
     known_scopes: frozenset[str] = frozenset()
+    enum_memberships_by_key: Mapping[str, frozenset[str]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
     alias_memberships_by_family: Mapping[str, frozenset[str]] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -53,9 +56,11 @@ def build_typecheck_services_from_file_texts(
 ) -> TypecheckServices:
     """Build generic type-membership services from schema + project file texts."""
     from jominipy.rules import (
+        build_complex_enum_values_from_file_texts,
         build_type_memberships_from_file_texts,
         extract_type_definitions,
         load_hoi4_alias_members_by_family,
+        load_hoi4_complex_enum_definitions,
         load_hoi4_field_constraints,
         load_hoi4_known_scopes,
         load_hoi4_schema_graph,
@@ -74,12 +79,17 @@ def build_typecheck_services_from_file_texts(
         file_texts_by_path=file_texts_by_path,
         field_constraints_by_object=field_constraints,
     )
+    complex_enum_memberships = build_complex_enum_values_from_file_texts(
+        file_texts_by_path=file_texts_by_path,
+        definitions_by_key=load_hoi4_complex_enum_definitions(),
+    )
     return TypecheckServices(
         asset_registry=asset_registry or NullAssetRegistry(),
         policy=policy or TypecheckPolicy(),
         type_memberships_by_key=MappingProxyType(memberships),
         value_memberships_by_key=MappingProxyType(value_memberships),
         known_scopes=load_hoi4_known_scopes(),
+        enum_memberships_by_key=MappingProxyType(complex_enum_memberships),
         alias_memberships_by_family=MappingProxyType(load_hoi4_alias_members_by_family()),
         subtype_matchers_by_object=MappingProxyType(load_hoi4_subtype_matchers_by_object()),
         subtype_field_constraints_by_object=MappingProxyType(load_hoi4_subtype_field_constraints_by_object()),

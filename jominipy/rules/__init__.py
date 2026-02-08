@@ -1,13 +1,18 @@
 """CWTools-like rules ingest and normalized IR utilities."""
 
 from jominipy.rules.adapter import (
+    ComplexEnumDefinition,
     ExpandedFieldConstraints,
+    NameTreePattern,
     SubtypeMatcher,
     build_alias_members_by_family,
+    build_complex_enum_definitions,
+    build_complex_enum_values_from_file_texts,
     build_expanded_field_constraints,
     build_subtype_field_constraints_by_object,
     build_subtype_matchers_by_object,
     load_hoi4_alias_members_by_family,
+    load_hoi4_complex_enum_definitions,
     load_hoi4_expanded_field_constraints,
     load_hoi4_subtype_field_constraints_by_object,
     load_hoi4_subtype_matchers_by_object,
@@ -57,9 +62,11 @@ from jominipy.rules.type_members import (
 )
 
 __all__ = [
+    "ComplexEnumDefinition",
     "ExpandedFieldConstraints",
     "IndexedRuleStatement",
     "LoadRulesResult",
+    "NameTreePattern",
     "RuleCardinality",
     "RuleExpression",
     "RuleFieldConstraint",
@@ -76,6 +83,8 @@ __all__ = [
     "SubtypeMatcher",
     "TypeDefinition",
     "build_alias_members_by_family",
+    "build_complex_enum_definitions",
+    "build_complex_enum_values_from_file_texts",
     "build_expanded_field_constraints",
     "build_field_constraints_by_object",
     "build_field_scope_constraints_by_object",
@@ -87,6 +96,7 @@ __all__ = [
     "collect_file_texts_under_root",
     "extract_type_definitions",
     "load_hoi4_alias_members_by_family",
+    "load_hoi4_complex_enum_definitions",
     "load_hoi4_enum_values",
     "load_hoi4_expanded_field_constraints",
     "load_hoi4_field_constraints",

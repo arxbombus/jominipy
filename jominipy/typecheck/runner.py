@@ -110,6 +110,8 @@ def _bind_services_to_rules(
             replacements["asset_registry"] = services.asset_registry
         if hasattr(rule, "policy"):
             replacements["policy"] = services.policy
+        if hasattr(rule, "enum_values_by_key") and not getattr(rule, "enum_values_by_key"):
+            replacements["enum_values_by_key"] = services.enum_memberships_by_key
         if hasattr(rule, "type_memberships_by_key") and not getattr(rule, "type_memberships_by_key"):
             replacements["type_memberships_by_key"] = services.type_memberships_by_key
         if hasattr(rule, "value_memberships_by_key") and not getattr(rule, "value_memberships_by_key"):

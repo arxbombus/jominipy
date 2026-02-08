@@ -510,6 +510,25 @@ def test_typecheck_field_reference_rule_applies_subtype_gating_per_object_occurr
     ]
 
 
+def test_typecheck_runner_binds_service_enum_memberships_for_enum_refs() -> None:
+    source = "technology={ stance = offensive }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "stance": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="enum_ref", raw="enum[stance]", argument="stance"),),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+    services = TypecheckServices(enum_memberships_by_key={"stance": frozenset({"offensive"})})
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,), services=services)
+    assert typecheck_result.diagnostics == []
+
+
 def test_typecheck_field_reference_rule_uses_dynamic_value_set_capture() -> None:
     source = "technology={ set_key = alpha has_key = beta }\ntechnology={ has_key = alpha }\n"
     custom_rule = FieldReferenceConstraintRule(

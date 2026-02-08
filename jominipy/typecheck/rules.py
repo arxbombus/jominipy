@@ -224,6 +224,8 @@ class FieldReferenceConstraintRule:
         if constraints is None:
             constraints = load_hoi4_field_constraints(include_implicit_required=False)
         enum_values = self.enum_values_by_key or load_hoi4_enum_values()
+        if self.enum_values_by_key is not None:
+            enum_values = _merge_membership_maps(load_hoi4_enum_values(), self.enum_values_by_key)
         known_type_keys = self.known_type_keys or load_hoi4_type_keys()
         known_scopes = self.known_scopes or load_hoi4_known_scopes()
         scope_constraints = self.field_scope_constraints_by_object
@@ -403,6 +405,7 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             policy=resolved_services.policy,
         ),
         FieldReferenceConstraintRule(
+            enum_values_by_key=resolved_services.enum_memberships_by_key,
             type_memberships_by_key=resolved_services.type_memberships_by_key,
             value_memberships_by_key=resolved_services.value_memberships_by_key,
             known_scopes=resolved_services.known_scopes,

@@ -49,7 +49,7 @@ For every parser/CST/AST feature, record:
 | Rules DSL parsing + generation | `xtask/codegen`, `biome_syntax_codegen/src/*` | planned `jominipy/rules/*` + generation pipeline | pending | Separate DSL parser and normalized IR for generated models/validators |
 | Rules semantic graph + resolved constraints | `biome_js_analyze` registry/services composition + `biome_service` JS handler orchestration | `jominipy/rules/schema_graph.py` + planned `typecheck/rules.py` resolved checks | pending | Schema graph foundation landed; resolved correctness checks still pending. Keep one parse lifecycle; place hard correctness in typecheck and keep lint policy/style-focused |
 
-### Rules ingest status (read-only phase)
+### Rules ingest + semantic adapter status
 - Landed `jominipy/rules` read-only ingest:
   - `RulesParseResult` carrier (`jominipy/rules/result.py`)
   - parsed statement IR + metadata attachment from `##`/`###` comments (`jominipy/rules/parser.py`, `jominipy/rules/ir.py`)
@@ -57,13 +57,17 @@ For every parser/CST/AST feature, record:
   - file/directory loaders (`jominipy/rules/load.py`)
 - Status interpretation:
   - DSL parsing is now `adapted` at ingest/IR level.
-  - code generation and engine consumption remain `pending`.
+  - code generation remains `pending`.
+  - engine consumption is now partially implemented through semantic adapters + typecheck services.
   - approved next parity step (2026-02-08): cross-file schema graph -> nested facts -> typecheck correctness expansion -> resolved reference checks -> advanced semantics wiring.
   - update (2026-02-08): cross-file schema graph foundation is implemented and consumed by HOI4 semantic loaders.
   - update (2026-02-08): nested analysis facts for object fields are implemented in shared facts cache (`jominipy/analysis/facts.py`) for deterministic field-level rule execution.
   - update (2026-02-08): primitive field-type/range correctness moved into typecheck (`TYPECHECK_INVALID_FIELD_TYPE`), keeping lint focused on policy/style concerns.
   - update (2026-02-08): registry-backed asset lookup contract added for typecheck (`jominipy/typecheck/assets.py`), mirroring Biome-style shared-service injection patterns while keeping one parse/facts lifecycle.
   - update (2026-02-08): HOI4 icon correctness is now documented as primarily type-reference resolution (`<spriteType>` from `interface/gfx.cwt`) with texture file existence validated on sprite definitions, not direct icon filename path checks alone.
+  - update (2026-02-08): alias/single-alias adapter wiring landed (`single_alias_right[...]` expansion + `alias_match_left[...]` membership checks) with checker integration.
+  - update (2026-02-08): subtype adapter wiring landed (deterministic matcher gating + subtype-conditional field constraints in typecheck).
+  - update (2026-02-08): complex enum materialization landed (project-file scan + name-tree traversal + `start_from_root`/path filtering) and is injected into enum reference checks through services.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

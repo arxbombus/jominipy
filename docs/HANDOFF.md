@@ -52,9 +52,9 @@ Every agent must perform this checklist before finishing a substantive task:
   - sibling/top-level scope isolation tests exist.
   - ambiguity detection exists for conflicting `replace_scope`.
 - Full-surface parity gaps now clearly identified:
-  - alias/single-alias execution semantics not implemented end-to-end
-  - subtype execution semantics not implemented end-to-end
-  - complex enum generation not implemented
+  - alias/single-alias execution semantics are now partially implemented (`single_alias_right` expansion + `alias_match_left` membership), but not end-to-end
+  - subtype execution semantics are now partially implemented (deterministic subtype matcher gating), but not full CWTools parity
+  - complex enum generation is now initially implemented (path/name-tree/start_from_root materialization), but not fully parity-hardened
   - special-file semantics only partially integrated (`scopes` aliases currently consumed; other files pending)
   - non-core option semantics (`comparison`, `error_if_only_match`, reference labels) not wired
 - Compatibility note:
@@ -174,10 +174,18 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase B (nested analysis facts for object fields) is now landed.
 - Phase 1.1 Phase C (initial primitive/range correctness in typecheck + field-type correctness migration out of lint) is now landed.
 - Phase 1.1 Phase C extension (registry-backed `filepath`/`icon` checks via `AssetRegistry`) is now landed.
-- Immediate next step: implement alias/single-alias semantic expansion and validation execution.
-- Immediate next step: implement subtype gating/materialization with deterministic conditional application.
+- Phase 1.1 Phase D (initial alias/single-alias semantic adapter wiring) is now landed.
+- Phase 1.1 Phase E (initial subtype gating/materialization) is now landed.
+- Phase 1.1 Phase F (initial complex enum materialization) is now landed.
 - Update (current): scope-context transition checks and scope-alias resolution (`this/root/from/fromfrom...` + `prev/prevprev...`) are landed in typecheck, including sibling-branch non-leakage and ambiguity diagnostics (`TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT`).
-- Immediate follow-up after subtype work: implement complex enums, then special-file semantic providers.
+- Immediate next step: implement special-file semantic providers (`links`, `modifiers`, `values`, `localisation`) and checker wiring.
+- Immediate follow-up: option-surface parity (`comparison`, `error_if_only_match`, reference labels), then strict precedence compatibility review for `push_scope`/`replace_scope`.
+- Drift correction note:
+  - During subtype rollout, subtype constraints were briefly merged unconditionally into base constraints in the adapter.
+  - This was corrected in the same iteration; subtype constraints now apply only through per-object-occurrence matcher resolution in typecheck.
+- Latest validation snapshot (post-alias/subtype/complex-enum phases):
+  - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`56 passed`)
+  - `uv run ruff check jominipy tests` (passed)
 - Technical-debt note (important): `project_root` service-binding for custom-injected typecheck rules (notably custom `value_set/value` constraints) is currently retained mainly for tests/compatibility and should be removed or narrowed once canonical rule-IR-based configuration is the only supported extension path.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering

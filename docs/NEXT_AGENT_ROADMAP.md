@@ -147,8 +147,12 @@ Phase 1.1 progress:
 - Completed: Phase B nested analysis facts (`jominipy/analysis/facts.py`) with deterministic object/field path + occurrence indexing.
 - Completed (initial): Phase C primitive/range correctness in typecheck (`jominipy/typecheck/rules.py`) with lint/typecheck ownership migration for field-type constraints.
 - Completed (additional): registry-backed `filepath`/`icon` validation contract via `AssetRegistry` (`jominipy/typecheck/assets.py`) and typecheck integration.
+- Completed (initial): Phase 5 alias/single-alias adapter wiring (`single_alias_right[...]` expansion + `alias_match_left[...]` membership checks).
+- Completed (initial): Phase 5 subtype gating/materialization (deterministic per-object subtype matcher gating + subtype-conditional field constraints).
+- Completed (initial): Phase 5 complex enum materialization (project-file scanning with `name` tree, `start_from_root`, and path filters).
 - Next:
-  - execute Phase 5 first (alias/single-alias + subtype + complex enum + special files), then Phase 6 option parity.
+  - execute remaining Phase 5 work (special-file semantic providers), then Phase 6 option parity.
+  - harden parity edge cases for alias/subtype/complex-enum semantics against CWTools behavior (`type_key_filter`, `starts_with`, subtype `push_scope`, complex enum edge-path semantics).
   - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 
 Boundary constraints (must remain true):

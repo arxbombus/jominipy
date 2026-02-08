@@ -53,16 +53,17 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Full type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms) against project-discovered members.
 - [ ] Final scope-resolution hardening (`scope[...]` + alias chain) across deeper cross-object flows and remaining non-trivial replacement edge cases.
 - [ ] Full value/value_set dynamic validation across files and execution scopes.
-- [ ] Alias/single-alias expansion and validation wiring.
-- [ ] Subtype resolution and subtype-conditional rule application.
+- [ ] Full alias expansion semantics beyond current `alias_match_left[...]` membership + `single_alias_right[...]` constraint expansion.
+- [ ] Full subtype semantics (`type_key_filter`, `starts_with`, subtype `push_scope`, ordering/precedence edge cases) beyond current field-value matcher gating.
+- [ ] Full complex enum semantics parity (additional path/structure edge cases and parity verification against CWTools behavior).
 - [ ] Special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
 - [ ] Full schema graph wiring into resolved correctness checks (enum/type/scope/value validation in typecheck).
 - [ ] Complete migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
 
 ### Highest-priority parity gaps (full-surface audit)
-- [ ] Alias/single-alias expansion and rule-application semantics (currently indexed but not executed semantically).
-- [ ] Subtype gating/materialization (`type_key_filter`, subtype `push_scope`, `starts_with`, etc.).
-- [ ] Complex enum generation from project files.
+- [ ] Full alias/single-alias execution parity (current pass covers `single_alias_right[...]` expansion and `alias_match_left[...]` membership checks only).
+- [ ] Full subtype gating/materialization parity (`type_key_filter`, subtype `push_scope`, `starts_with`, ordering semantics).
+- [ ] Full complex enum parity hardening (current pass materializes enums from project files with `name` tree + `start_from_root` + path filters).
 - [ ] Special-file semantic ingestion beyond current `scopes` alias loading.
 - [ ] Option-surface parity for non-core options used by CWTools execution (`comparison`, `error_if_only_match`, reference labels).
 - [ ] Compatibility decision for strict CWTools `push_scope`/`replace_scope` precedence behavior.
