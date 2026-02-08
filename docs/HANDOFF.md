@@ -33,9 +33,10 @@ Every agent must perform this checklist before finishing a substantive task:
 - Active workstream: CWTools rules ingest -> normalized IR -> typed semantic enforcement.
 - Current sequencing source of truth: `docs/RULES_SYNTAX.md` -> `Implementation Checklist (jominipy status)`.
 - Immediate implementation order:
-  1. primitive/range checks (`int[...]`, `float[...]`, and simple primitive families)
-  2. resolved reference checks (`enum[...]`, `<type_key>`, `scope[...]`)
-  3. move hard correctness checks to typecheck ownership
+  1. extend shared analysis facts for nested field validation
+  2. implement primitive/range correctness in typecheck (`int[...]`, `float[...]`, primitive families)
+  3. implement resolved reference correctness (`enum[...]`, `<type_key>`, `scope[...]`)
+  4. wire advanced semantics (alias/single-alias/subtype/special files)
 - Core invariants remain required:
   - one parse/facts lifecycle (`JominiParseResult`)
   - lint/typecheck boundary contracts
@@ -150,10 +151,11 @@ Every agent must perform this checklist before finishing a substantive task:
 
 ## Current Next Task
 - Phase 0 planning gate is complete.
-- Immediate next step: start Phase 1 execution (lint engine core) under the approved proposal constraints.
-- Immediate next step: replace scaffold rules with CWTools-derived rule IR consumers under the enforced lint/checker contracts.
-- Immediate next step: map `jominipy/rules` normalized IR into lint/type-check rule registries while preserving one parse/facts lifecycle and domain contracts.
-- Immediate next step: expand type validation beyond primitive scalar fields (enum membership, scope refs, type refs, block/tagged constraints) and begin moving hard constraints into typecheck ownership where appropriate.
+- Phase 1.1 rules-parity execution plan was drafted and documented before implementation.
+- Phase 1.1 Phase A (cross-file schema graph/index foundation) is now landed.
+- Immediate next step: execute Phase B by extending shared analysis facts for nested field-level validation.
+- Immediate next step: execute Phase C by adding primitive/range correctness checks in typecheck and migrating corresponding hard checks out of lint.
+- Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule from CWTools-derived constraints (required fields/cardinality)

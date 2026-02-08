@@ -15,6 +15,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [x] Declaration-path disambiguation for repeated keys (`declaration_path`).
 - [x] Extract required fields from cardinality metadata.
 - [x] Extract per-field RHS value specs (primitive, enum ref, scope ref, type ref, value refs, block/tagged forms).
+- [x] Cross-file HOI4 schema graph/index foundation over `references/hoi4-rules/Config` (types/enums/aliases/sections/value families + top-level rule objects).
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
   - [x] Primitive scalar type checks for `int`/`float`/`bool`.
@@ -29,7 +30,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Alias/single-alias expansion and validation wiring.
 - [ ] Subtype resolution and subtype-conditional rule application.
 - [ ] Special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
-- [ ] Full cross-file schema graph/index that wires enums/types/aliases/scopes together for correctness checks.
+- [ ] Full schema graph wiring into resolved correctness checks (enum/type/scope/value validation in typecheck).
 - [ ] Migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
 
 ##### Table of Contents  

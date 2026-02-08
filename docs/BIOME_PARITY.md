@@ -47,6 +47,7 @@ For every parser/CST/AST feature, record:
 | Formatter runner boundary | `biome_js_formatter/src/lib.rs` | `jominipy/format/runner.py` | pending | CST/trivia remains source-of-truth; AST views only guide decisions |
 | Type-checker boundary | `biome_js_semantic/src/*`, `biome_js_type_info/src/*` | `jominipy/typecheck/*` | adapted | Engine scaffold + rule-domain enforcement landed (`correctness` + `sound` contracts) |
 | Rules DSL parsing + generation | `xtask/codegen`, `biome_syntax_codegen/src/*` | planned `jominipy/rules/*` + generation pipeline | pending | Separate DSL parser and normalized IR for generated models/validators |
+| Rules semantic graph + resolved constraints | `biome_js_analyze` registry/services composition + `biome_service` JS handler orchestration | `jominipy/rules/schema_graph.py` + planned `typecheck/rules.py` resolved checks | pending | Schema graph foundation landed; resolved correctness checks still pending. Keep one parse lifecycle; place hard correctness in typecheck and keep lint policy/style-focused |
 
 ### Rules ingest status (read-only phase)
 - Landed `jominipy/rules` read-only ingest:
@@ -57,6 +58,8 @@ For every parser/CST/AST feature, record:
 - Status interpretation:
   - DSL parsing is now `adapted` at ingest/IR level.
   - code generation and engine consumption remain `pending`.
+  - approved next parity step (2026-02-08): cross-file schema graph -> nested facts -> typecheck correctness expansion -> resolved reference checks -> advanced semantics wiring.
+  - update (2026-02-08): cross-file schema graph foundation is implemented and consumed by HOI4 semantic loaders.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

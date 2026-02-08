@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 import re
 from typing import Literal
 
 from jominipy.rules.ir import RuleExpression, RuleMetadata, RuleStatement
-from jominipy.rules.load import load_rules_paths
+from jominipy.rules.schema_graph import load_hoi4_schema_graph
 
 _SIMPLE_FIELD_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SCALAR_PATTERN = re.compile(r"^(?P<head>[^\[\]]+)(?:\[(?P<arg>.*)\])?$")
@@ -183,16 +182,13 @@ def _merge_value_specs(
 
 @lru_cache(maxsize=1)
 def load_hoi4_required_fields(*, include_implicit_required: bool = False) -> dict[str, tuple[str, ...]]:
-    """Load required fields derived from the HOI4 technologies CWTools schema."""
-    root = Path(__file__).resolve().parents[2]
-    technologies = root / "references/hoi4-rules/Config/common/technologies.cwt"
-    if not technologies.exists():
+    """Load required fields derived from the HOI4 cross-file CWTools schema."""
+    schema = load_hoi4_schema_graph()
+    if not schema.top_level_rule_statements:
         return {}
 
-    loaded = load_rules_paths((technologies,))
-    file_ir = loaded.ruleset.files[0]
     return build_required_fields_by_object(
-        file_ir.statements,
+        schema.top_level_rule_statements,
         include_implicit_required=include_implicit_required,
     )
 
@@ -202,15 +198,12 @@ def load_hoi4_field_constraints(
     *,
     include_implicit_required: bool = False,
 ) -> dict[str, dict[str, RuleFieldConstraint]]:
-    """Load per-object field constraints from HOI4 technologies schema."""
-    root = Path(__file__).resolve().parents[2]
-    technologies = root / "references/hoi4-rules/Config/common/technologies.cwt"
-    if not technologies.exists():
+    """Load per-object field constraints from the HOI4 cross-file CWTools schema."""
+    schema = load_hoi4_schema_graph()
+    if not schema.top_level_rule_statements:
         return {}
 
-    loaded = load_rules_paths((technologies,))
-    file_ir = loaded.ruleset.files[0]
     return build_field_constraints_by_object(
-        file_ir.statements,
+        schema.top_level_rule_statements,
         include_implicit_required=include_implicit_required,
     )

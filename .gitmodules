@@ -10,3 +10,6 @@
 [submodule "references/biome"]
 	path = references/biome
 	url = https://github.com/biomejs/biome.git
+[submodule "references/Millennium_Dawn"]
+	path = references/Millennium_Dawn
+	url = https://gitlab.com/Millennium_Dawn/Millennium_Dawn.git

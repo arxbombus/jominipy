@@ -2,9 +2,12 @@ from pathlib import Path
 
 from jominipy.rules import (
     RuleFieldConstraint,
+    RuleSchemaGraph,
     RuleValueSpec,
     build_field_constraints_by_object,
     build_required_fields_by_object,
+    load_hoi4_required_fields,
+    load_hoi4_schema_graph,
     load_rules_paths,
     parse_rules_text,
     to_file_ir,
@@ -184,3 +187,23 @@ def test_field_constraint_extraction_from_scalar_specs() -> None:
         }
     }
     assert constraints == expected
+
+
+def test_hoi4_schema_graph_loads_cross_file_categories() -> None:
+    schema = load_hoi4_schema_graph()
+
+    assert isinstance(schema, RuleSchemaGraph)
+    assert schema.source_root.endswith("references/hoi4-rules/Config")
+    assert "type" in schema.by_category
+    assert "alias" in schema.by_category
+    assert "section" in schema.by_category
+    assert "technology" in schema.types_by_key
+    assert any(name.startswith("effect:") for name in schema.aliases_by_key)
+
+
+def test_hoi4_required_fields_are_derived_from_cross_file_schema() -> None:
+    required = load_hoi4_required_fields(include_implicit_required=False)
+
+    # `style` lives in `common/national_focus.cwt`, not technologies.cwt.
+    assert "style" in required
+    assert "name" in required["style"]

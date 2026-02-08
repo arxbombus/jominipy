@@ -116,6 +116,35 @@ Status:
     - scope-reference validation (`scope[...]`, `push_scope`, `replace_scope`)
   - keep correctness checks migrating toward typecheck ownership; keep lint focused on policy/style/heuristics.
 
+## Phase 1.1: Rules Parity Execution Plan (2026-02-08, approved proposal)
+Goal: implement CWTools rules semantics with explicit Biome-style ownership boundaries and one shared parse lifecycle.
+
+Execution phases (ordered):
+1. Schema graph foundation (landed):
+   - add full cross-file rules schema graph/index (enums, types, aliases, single_alias, scope metadata, value/value_set).
+   - remove single-file dependency on `common/technologies.cwt` as the only schema source.
+2. Nested analysis facts:
+   - extend shared analysis facts to include nested object/field facts with stable source ranges.
+   - keep fact generation single-pass and parse-lifecycle cached.
+3. Typecheck correctness expansion (primary ownership):
+   - migrate hard correctness checks from lint into typecheck.
+   - implement primitive/range correctness (`int[min..max]`, `float[min..max]`, and additional primitive families such as `date_field`/`percentage_field`/variable-value variants).
+4. Resolved-reference correctness:
+   - enforce `enum[...]` membership.
+   - enforce `<type_key>` (including prefixed/suffixed forms) against resolved type declarations.
+   - enforce `scope[...]` with scope-stack transitions from `push_scope`/`replace_scope`.
+5. Advanced CWTools semantics:
+   - wire alias/single-alias expansion, subtype-conditional application, and special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`).
+
+Phase 1.1 progress:
+- Completed: Phase A schema graph foundation (`jominipy/rules/schema_graph.py`) and semantic-loader wiring to cross-file HOI4 config graph.
+- Next: Phase B nested analysis facts, then Phase C primitive/range correctness in typecheck.
+
+Boundary constraints (must remain true):
+- `typecheck` owns correctness diagnostics (`TYPECHECK_*`, `domain=correctness`, `confidence=sound`).
+- `lint` owns policy/style/heuristic diagnostics (`LINT_*`).
+- `lint` may consume type facts; typecheck must not depend on lint execution.
+
 ## Phase 1 Boundary Contracts (completed)
 - checker rule contracts are enforced mechanically:
   - domain must be `correctness`
