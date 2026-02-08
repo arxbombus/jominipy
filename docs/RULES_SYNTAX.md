@@ -21,14 +21,17 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [x] Primitive range enforcement for numeric primitives (`int[min..max]`, `float[min..max]`) in typecheck.
 - [x] Initial additional primitive-family checks in typecheck (`date_field`, `percentage_field`, `variable_field`, `int_variable_field`, `value_field`, `int_value_field`).
 - [x] Registry-backed `filepath[...]` and `icon[...]` checks in typecheck via pluggable asset registry contract (deferred/unknown when no registry is configured).
+- [x] Typecheck service/policy wiring for unresolved checks (asset/reference defer vs strict error modes).
+- [x] Initial resolved-reference correctness in typecheck:
+  - [x] `enum[...]` membership checks from cross-file HOI4 schema graph.
+  - [x] `<type_key>` key existence checks from schema + optional injected type-membership sets (for project-level resolution such as `<spriteType>`).
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
   - [x] Primitive scalar type checks for `int`/`float`/`bool` (historical; now owned by typecheck for correctness).
 
 ### Not implemented yet (pending)
 - [ ] Strict handling for remaining primitive-family semantics (tighter variable/value reference semantics and project-policy decisions for unresolved asset lookups).
-- [ ] Enum membership resolution and validation (`enum[key]` -> concrete allowed values).
-- [ ] Type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms).
+- [ ] Full type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms) against project-discovered members.
 - [ ] Scope-resolution checks (`scope[...]`, scope stack transitions from `push_scope`/`replace_scope`).
 - [ ] Value/value_set dynamic capture and validation.
 - [ ] Alias/single-alias expansion and validation wiring.

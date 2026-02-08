@@ -8,6 +8,11 @@ from jominipy.typecheck.assets import (
     SetAssetRegistry,
 )
 from jominipy.typecheck.runner import run_typecheck
+from jominipy.typecheck.services import (
+    TypecheckPolicy,
+    TypecheckServices,
+    UnresolvedPolicy,
+)
 
 __all__ = [
     "AssetLookup",
@@ -15,5 +20,8 @@ __all__ = [
     "AssetRegistry",
     "NullAssetRegistry",
     "SetAssetRegistry",
+    "TypecheckPolicy",
+    "TypecheckServices",
+    "UnresolvedPolicy",
     "run_typecheck",
 ]

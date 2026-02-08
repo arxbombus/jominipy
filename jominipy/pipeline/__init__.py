@@ -16,6 +16,7 @@ from jominipy.pipeline.results import (
 if TYPE_CHECKING:
     from jominipy.lint.rules import LintRule
     from jominipy.typecheck.rules import TypecheckRule
+    from jominipy.typecheck.services import TypecheckServices
 
 
 def run_lint(
@@ -70,10 +71,18 @@ def run_typecheck(
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
     rules: tuple[TypecheckRule, ...] | None = None,
+    services: TypecheckServices | None = None,
 ) -> TypecheckRunResult:
     from jominipy.pipeline.entrypoints import run_typecheck as _run_typecheck
 
-    return _run_typecheck(text, options=options, mode=mode, parse=parse, rules=rules)
+    return _run_typecheck(
+        text,
+        options=options,
+        mode=mode,
+        parse=parse,
+        rules=rules,
+        services=services,
+    )
 
 
 __all__ = [

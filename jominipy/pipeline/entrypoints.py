@@ -19,6 +19,7 @@ from jominipy.pipeline.results import (
 if TYPE_CHECKING:
     from jominipy.lint.rules import LintRule
     from jominipy.typecheck.rules import TypecheckRule
+    from jominipy.typecheck.services import TypecheckServices
 from jominipy.typecheck import run_typecheck as _run_typecheck
 
 
@@ -55,6 +56,7 @@ def run_typecheck(
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
     rules: tuple[TypecheckRule, ...] | None = None,
+    services: TypecheckServices | None = None,
 ) -> TypecheckRunResult:
     """Run type checking over one Jomini parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
@@ -62,6 +64,7 @@ def run_typecheck(
         resolved_parse.source_text,
         parse=resolved_parse,
         rules=rules,
+        services=services,
     )
 
 

@@ -14,6 +14,7 @@ from jominipy.typecheck.rules import (
     default_typecheck_rules,
     validate_typecheck_rules,
 )
+from jominipy.typecheck.services import TypecheckServices
 
 
 def run_typecheck(
@@ -23,13 +24,19 @@ def run_typecheck(
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
     rules: Sequence[TypecheckRule] | None = None,
+    services: TypecheckServices | None = None,
 ) -> TypecheckRunResult:
     """Run type checking from a single parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
     analysis_facts = resolved_parse.analysis_facts()
     type_facts = build_typecheck_facts(analysis_facts)
 
-    resolved_rules = tuple(rules) if rules is not None else default_typecheck_rules()
+    resolved_services = services if services is not None else TypecheckServices()
+    resolved_rules = (
+        tuple(rules)
+        if rules is not None
+        else default_typecheck_rules(services=resolved_services)
+    )
     validate_typecheck_rules(resolved_rules)
 
     diagnostics = list(resolved_parse.diagnostics)

@@ -6,8 +6,10 @@ from jominipy.rules import (
     RuleValueSpec,
     build_field_constraints_by_object,
     build_required_fields_by_object,
+    load_hoi4_enum_values,
     load_hoi4_required_fields,
     load_hoi4_schema_graph,
+    load_hoi4_type_keys,
     load_rules_paths,
     parse_rules_text,
     to_file_ir,
@@ -178,7 +180,9 @@ def test_field_constraint_extraction_from_scalar_specs() -> None:
             ),
             "scoped": RuleFieldConstraint(
                 required=False,
-                value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", primitive=None, argument="country"),),
+                value_specs=(
+                    RuleValueSpec(kind="scope_ref", raw="scope[country]", primitive=None, argument="country"),
+                ),
             ),
             "complex": RuleFieldConstraint(
                 required=False,
@@ -207,3 +211,12 @@ def test_hoi4_required_fields_are_derived_from_cross_file_schema() -> None:
     # `style` lives in `common/national_focus.cwt`, not technologies.cwt.
     assert "style" in required
     assert "name" in required["style"]
+
+
+def test_hoi4_enum_values_and_type_keys_load_from_schema_graph() -> None:
+    enum_values = load_hoi4_enum_values()
+    type_keys = load_hoi4_type_keys()
+
+    assert "add_factor" in enum_values
+    assert "add" in enum_values["add_factor"]
+    assert "spriteType" in type_keys

@@ -86,6 +86,13 @@ TYPECHECK_INVALID_FIELD_TYPE: Final[DiagnosticSpec] = DiagnosticSpec(
     category="typecheck",
 )
 
+TYPECHECK_INVALID_FIELD_REFERENCE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="TYPECHECK_INVALID_FIELD_REFERENCE",
+    message="Field value does not match CWTools reference constraints.",
+    severity="warning",
+    category="typecheck",
+)
+
 LINT_SEMANTIC_INCONSISTENT_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
     code="LINT_SEMANTIC_INCONSISTENT_SHAPE",
     message="Semantic rule: mixed value shapes should be normalized.",

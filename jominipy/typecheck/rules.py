@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Literal, Protocol
+from types import MappingProxyType
+from typing import Literal, Mapping, Protocol
 
 from jominipy.analysis import AnalysisFacts
 from jominipy.ast import (
@@ -15,13 +16,16 @@ from jominipy.ast import (
 )
 from jominipy.diagnostics import (
     TYPECHECK_INCONSISTENT_VALUE_SHAPE,
+    TYPECHECK_INVALID_FIELD_REFERENCE,
     TYPECHECK_INVALID_FIELD_TYPE,
     Diagnostic,
 )
 from jominipy.rules.semantics import (
     RuleFieldConstraint,
     RuleValueSpec,
+    load_hoi4_enum_values,
     load_hoi4_field_constraints,
+    load_hoi4_type_keys,
 )
 from jominipy.text import TextRange, TextSize
 from jominipy.typecheck.assets import (
@@ -29,12 +33,20 @@ from jominipy.typecheck.assets import (
     AssetRegistry,
     NullAssetRegistry,
 )
+from jominipy.typecheck.services import TypecheckPolicy, TypecheckServices
 
 type TypecheckDomain = Literal["correctness"]
 type TypecheckConfidence = Literal["sound"]
 
 _VARIABLE_REF_PATTERN = re.compile(r"^[A-Za-z_@][A-Za-z0-9_:@.\-]*$")
 _RANGE_PATTERN = re.compile(r"^(?P<min>-?(?:\d+\.\d+|\d+)|-?inf)\.\.(?P<max>-?(?:\d+\.\d+|\d+)|inf)$")
+_REFERENCE_SPEC_KINDS = {
+    "enum_ref",
+    "scope_ref",
+    "value_ref",
+    "value_set_ref",
+    "type_ref",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +109,7 @@ class FieldConstraintRule:
     confidence: TypecheckConfidence = "sound"
     field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
     asset_registry: AssetRegistry = NullAssetRegistry()
+    policy: TypecheckPolicy = TypecheckPolicy()
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
         constraints = self.field_constraints_by_object
@@ -113,24 +126,110 @@ class FieldConstraintRule:
                 field_facts = field_map.get(field_name)
                 if not field_facts:
                     continue
+                primitive_specs = tuple(
+                    spec for spec in constraint.value_specs if spec.kind not in _REFERENCE_SPEC_KINDS
+                )
+                if not primitive_specs:
+                    continue
                 for field_fact in field_facts:
-                    if _matches_field_constraint(
+                    if _matches_value_specs(
                         field_fact.value,
-                        constraint,
+                        primitive_specs,
                         asset_registry=self.asset_registry,
+                        policy=self.policy,
                     ):
+                        continue
+                    if _has_reference_specs(constraint.value_specs):
+                        # Leave mixed primitive/reference unions to the reference rule.
                         continue
                     diagnostics.append(
                         Diagnostic(
                             code=self.code,
                             message=(
                                 f"{TYPECHECK_INVALID_FIELD_TYPE.message} "
-                                f"`{object_key}.{field_name}` does not match {_format_value_specs(constraint.value_specs)}."
+                                f"`{object_key}.{field_name}` does not match {_format_value_specs(primitive_specs)}."
                             ),
                             range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
                             severity=TYPECHECK_INVALID_FIELD_TYPE.severity,
                             hint=f"Use a value matching the schema for `{field_name}`.",
                             category=TYPECHECK_INVALID_FIELD_TYPE.category,
+                        )
+                    )
+        return diagnostics
+
+
+@dataclass(frozen=True, slots=True)
+class FieldReferenceConstraintRule:
+    """Checks field values against CWTools-derived resolved-reference constraints."""
+
+    code: str = TYPECHECK_INVALID_FIELD_REFERENCE.code
+    name: str = "fieldReferenceConstraint"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
+    enum_values_by_key: Mapping[str, frozenset[str]] | None = None
+    known_type_keys: frozenset[str] | None = None
+    type_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
+    value_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
+    known_scopes: frozenset[str] = frozenset()
+    policy: TypecheckPolicy = TypecheckPolicy()
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        constraints = self.field_constraints_by_object
+        if constraints is None:
+            constraints = load_hoi4_field_constraints(include_implicit_required=False)
+        enum_values = self.enum_values_by_key or load_hoi4_enum_values()
+        known_type_keys = self.known_type_keys or load_hoi4_type_keys()
+
+        diagnostics: list[Diagnostic] = []
+        for object_key, field_constraints in constraints.items():
+            field_map = facts.object_field_map.get(object_key)
+            if not field_map:
+                continue
+            for field_name, constraint in field_constraints.items():
+                field_facts = field_map.get(field_name)
+                if not field_facts:
+                    continue
+                reference_specs = tuple(
+                    spec for spec in constraint.value_specs if spec.kind in _REFERENCE_SPEC_KINDS
+                )
+                if not reference_specs:
+                    continue
+                non_reference_specs = tuple(
+                    spec for spec in constraint.value_specs if spec.kind not in _REFERENCE_SPEC_KINDS
+                )
+
+                for field_fact in field_facts:
+                    if non_reference_specs and _matches_value_specs(
+                        field_fact.value,
+                        non_reference_specs,
+                        asset_registry=NullAssetRegistry(),
+                        policy=self.policy,
+                    ):
+                        continue
+                    if _matches_reference_specs(
+                        field_fact.value,
+                        reference_specs,
+                        enum_values_by_key=enum_values,
+                        known_type_keys=known_type_keys,
+                        type_memberships_by_key=self.type_memberships_by_key,
+                        value_memberships_by_key=self.value_memberships_by_key,
+                        known_scopes=self.known_scopes,
+                        policy=self.policy,
+                    ):
+                        continue
+                    diagnostics.append(
+                        Diagnostic(
+                            code=self.code,
+                            message=(
+                                f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                f"`{object_key}.{field_name}` does not match "
+                                f"{_format_value_specs(reference_specs)}."
+                            ),
+                            range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                            severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                            hint=f"Use a schema-resolved reference for `{field_name}`.",
+                            category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
                         )
                     )
         return diagnostics
@@ -144,8 +243,21 @@ def build_typecheck_facts(facts: AnalysisFacts) -> TypecheckFacts:
     return TypecheckFacts(inconsistent_top_level_shapes=inconsistent)
 
 
-def default_typecheck_rules() -> tuple[TypecheckRule, ...]:
-    rules: list[TypecheckRule] = [InconsistentTopLevelShapeRule(), FieldConstraintRule()]
+def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tuple[TypecheckRule, ...]:
+    resolved_services = services if services is not None else TypecheckServices()
+    rules: list[TypecheckRule] = [
+        InconsistentTopLevelShapeRule(),
+        FieldConstraintRule(
+            asset_registry=resolved_services.asset_registry,
+            policy=resolved_services.policy,
+        ),
+        FieldReferenceConstraintRule(
+            type_memberships_by_key=resolved_services.type_memberships_by_key,
+            value_memberships_by_key=resolved_services.value_memberships_by_key,
+            known_scopes=resolved_services.known_scopes,
+            policy=resolved_services.policy,
+        ),
+    ]
     return tuple(sorted(rules, key=lambda rule: (rule.code, rule.name)))
 
 
@@ -185,15 +297,23 @@ def _find_key_occurrence_range(text: str, key: str, occurrence: int) -> TextRang
     return TextRange.at(TextSize(index), TextSize(len(key)))
 
 
-def _matches_field_constraint(
+def _matches_value_specs(
     value: object | None,
-    constraint: RuleFieldConstraint,
+    specs: tuple[RuleValueSpec, ...],
     *,
     asset_registry: AssetRegistry,
+    policy: TypecheckPolicy,
 ) -> bool:
-    if not constraint.value_specs:
+    if not specs:
         return True
-    return any(_matches_value_spec(value, spec, asset_registry=asset_registry) for spec in constraint.value_specs)
+    return any(
+        _matches_value_spec(value, spec, asset_registry=asset_registry, policy=policy)
+        for spec in specs
+    )
+
+
+def _has_reference_specs(specs: tuple[RuleValueSpec, ...]) -> bool:
+    return any(spec.kind in _REFERENCE_SPEC_KINDS for spec in specs)
 
 
 def _matches_value_spec(
@@ -201,9 +321,12 @@ def _matches_value_spec(
     spec: RuleValueSpec,
     *,
     asset_registry: AssetRegistry,
+    policy: TypecheckPolicy,
 ) -> bool:
-    if spec.kind in {"missing", "unknown_ref", "enum_ref", "scope_ref", "value_ref", "value_set_ref", "type_ref"}:
+    if spec.kind in {"missing", "unknown_ref"}:
         return True
+    if spec.kind in _REFERENCE_SPEC_KINDS:
+        return False
     if spec.kind == "block":
         return isinstance(value, AstBlock)
     if spec.kind == "tagged_block":
@@ -222,6 +345,7 @@ def _matches_value_spec(
         primitive=primitive,
         argument=spec.argument,
         asset_registry=asset_registry,
+        policy=policy,
     )
 
 
@@ -231,6 +355,7 @@ def _matches_primitive(
     primitive: str,
     argument: str | None,
     asset_registry: AssetRegistry,
+    policy: TypecheckPolicy,
 ) -> bool:
     parsed = interpret_scalar(value.raw_text, was_quoted=value.was_quoted)
     number_value = parsed.number_value
@@ -262,6 +387,7 @@ def _matches_primitive(
             primitive=primitive,
             argument=argument,
             asset_registry=asset_registry,
+            policy=policy,
         )
     return True
 
@@ -300,6 +426,7 @@ def _matches_asset_primitive(
     primitive: str,
     argument: str | None,
     asset_registry: AssetRegistry,
+    policy: TypecheckPolicy,
 ) -> bool:
     raw_value = _strip_scalar_quotes(raw_text)
     if not raw_value:
@@ -317,9 +444,82 @@ def _matches_asset_primitive(
 
     lookup = asset_registry.lookup(candidate)
     if lookup.status == AssetLookupStatus.UNKNOWN:
-        # No project registry configured: skip hard decision for now.
-        return True
+        return policy.unresolved_asset == "defer"
     return lookup.status == AssetLookupStatus.FOUND
+
+
+def _matches_reference_specs(
+    value: object | None,
+    specs: tuple[RuleValueSpec, ...],
+    *,
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    known_scopes: frozenset[str],
+    policy: TypecheckPolicy,
+) -> bool:
+    return any(
+        _matches_reference_spec(
+            value,
+            spec,
+            enum_values_by_key=enum_values_by_key,
+            known_type_keys=known_type_keys,
+            type_memberships_by_key=type_memberships_by_key,
+            value_memberships_by_key=value_memberships_by_key,
+            known_scopes=known_scopes,
+            policy=policy,
+        )
+        for spec in specs
+    )
+
+
+def _matches_reference_spec(
+    value: object | None,
+    spec: RuleValueSpec,
+    *,
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    known_scopes: frozenset[str],
+    policy: TypecheckPolicy,
+) -> bool:
+    if not isinstance(value, AstScalar):
+        return False
+    raw = _strip_scalar_quotes(value.raw_text)
+    key = (spec.argument or "").strip()
+
+    if spec.kind == "enum_ref":
+        allowed = enum_values_by_key.get(key)
+        if allowed is None:
+            return policy.unresolved_reference == "defer"
+        return raw in allowed
+
+    if spec.kind == "type_ref":
+        if not key:
+            return policy.unresolved_reference == "defer"
+        if key not in known_type_keys:
+            return False
+        members = type_memberships_by_key.get(key)
+        if members is None:
+            return policy.unresolved_reference == "defer"
+        return raw in members
+
+    if spec.kind == "scope_ref":
+        if not known_scopes:
+            return policy.unresolved_reference == "defer"
+        return raw in known_scopes
+
+    if spec.kind in {"value_ref", "value_set_ref"}:
+        if not key:
+            return policy.unresolved_reference == "defer"
+        members = value_memberships_by_key.get(key)
+        if members is None:
+            return policy.unresolved_reference == "defer"
+        return raw in members
+
+    return False
 
 
 def _build_filepath_candidate(*, raw_value: str, argument: str | None) -> str:

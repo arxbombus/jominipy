@@ -13,9 +13,12 @@ from jominipy.rules import RuleFieldConstraint, RuleValueSpec
 from jominipy.typecheck.assets import SetAssetRegistry
 from jominipy.typecheck.rules import (
     FieldConstraintRule,
+    FieldReferenceConstraintRule,
     TypecheckFacts,
     TypecheckRule,
+    default_typecheck_rules,
 )
+from jominipy.typecheck.services import TypecheckPolicy, TypecheckServices
 
 
 def test_parse_result_analysis_facts_are_cached_across_engines() -> None:
@@ -244,6 +247,131 @@ def test_typecheck_filepath_icon_defer_without_registry() -> None:
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))
     assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_filepath_icon_unknown_policy_error_without_registry() -> None:
+    source = "technology={ texture = focus_icon badge = war_goal }\n"
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "texture": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(
+                            kind="primitive",
+                            raw="filepath[gfx/interface/goals/,.dds]",
+                            primitive="filepath",
+                            argument="gfx/interface/goals/,.dds",
+                        ),
+                    ),
+                ),
+                "badge": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(
+                            kind="primitive",
+                            raw="icon[gfx/interface/goals]",
+                            primitive="icon",
+                            argument="gfx/interface/goals",
+                        ),
+                    ),
+                ),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_asset="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    codes = [diagnostic.code for diagnostic in typecheck_result.diagnostics]
+    assert codes == ["TYPECHECK_INVALID_FIELD_TYPE", "TYPECHECK_INVALID_FIELD_TYPE"]
+
+
+def test_typecheck_field_reference_rule_validates_enum_membership() -> None:
+    source = "technology={ stance = defensive }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "stance": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="enum_ref", raw="enum[stance]", argument="stance"),),
+                ),
+            }
+        },
+        enum_values_by_key={"stance": frozenset({"offensive"})},
+        known_type_keys=frozenset(),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_field_reference_rule_validates_type_membership() -> None:
+    source = "technology={ icon = GFX_focus_test }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "icon": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="type_ref", raw="<spriteType>", argument="spriteType"),),
+                ),
+            }
+        },
+        known_type_keys=frozenset({"spriteType"}),
+        type_memberships_by_key={"spriteType": frozenset({"GFX_focus_other"})},
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_field_reference_rule_unresolved_policy_controls_outcome() -> None:
+    source = "technology={ icon = GFX_focus_test }\n"
+    custom_rule_defer = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "icon": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="type_ref", raw="<spriteType>", argument="spriteType"),),
+                ),
+            }
+        },
+        known_type_keys=frozenset({"spriteType"}),
+        policy=TypecheckPolicy(unresolved_reference="defer"),
+    )
+    custom_rule_error = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "icon": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="type_ref", raw="<spriteType>", argument="spriteType"),),
+                ),
+            }
+        },
+        known_type_keys=frozenset({"spriteType"}),
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    defer_result = run_typecheck(source, rules=(custom_rule_defer,))
+    error_result = run_typecheck(source, rules=(custom_rule_error,))
+
+    assert defer_result.diagnostics == []
+    assert [diagnostic.code for diagnostic in error_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_default_typecheck_rules_accept_injected_services_policy() -> None:
+    services = TypecheckServices(policy=TypecheckPolicy(unresolved_asset="error"))
+
+    rules = default_typecheck_rules(services=services)
+    field_rules = [rule for rule in rules if isinstance(rule, FieldConstraintRule)]
+
+    assert len(field_rules) == 1
+    assert field_rules[0].policy.unresolved_asset == "error"
 
 
 def test_analysis_facts_include_nested_object_fields_with_occurrence_tracking() -> None:

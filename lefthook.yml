@@ -10,6 +10,6 @@ pre-commit:
       glob: "*.py"
       run: uv run pyrefly check {staged_files}
 
-    "Checking with Ruff":
+    "Linting with Ruff":
       glob: "*.py"
       run: uv run ruff check {staged_files}

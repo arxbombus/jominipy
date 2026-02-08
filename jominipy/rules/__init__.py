@@ -28,8 +28,10 @@ from jominipy.rules.semantics import (
     RuleValueSpec,
     build_field_constraints_by_object,
     build_required_fields_by_object,
+    load_hoi4_enum_values,
     load_hoi4_field_constraints,
     load_hoi4_required_fields,
+    load_hoi4_type_keys,
 )
 
 __all__ = [
@@ -50,9 +52,11 @@ __all__ = [
     "build_field_constraints_by_object",
     "build_required_fields_by_object",
     "build_schema_graph",
+    "load_hoi4_enum_values",
     "load_hoi4_field_constraints",
     "load_hoi4_required_fields",
     "load_hoi4_schema_graph",
+    "load_hoi4_type_keys",
     "load_rules_directory",
     "load_rules_paths",
     "parse_rules_file",

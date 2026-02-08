@@ -224,3 +224,32 @@ def load_hoi4_field_constraints(
         schema.top_level_rule_statements,
         include_implicit_required=include_implicit_required,
     )
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_enum_values() -> dict[str, frozenset[str]]:
+    """Load enum key -> allowed scalar values from HOI4 schema graph."""
+    schema = load_hoi4_schema_graph()
+    values_by_enum: dict[str, set[str]] = {}
+    for enum_key, declarations in schema.enums_by_key.items():
+        bucket = values_by_enum.setdefault(enum_key, set())
+        for declaration in declarations:
+            statement = declaration.statement
+            if statement.value.kind != "block":
+                continue
+            for child in statement.value.block:
+                if child.kind != "value":
+                    continue
+                if child.value.kind != "scalar":
+                    continue
+                raw = (child.value.text or "").strip()
+                if raw:
+                    bucket.add(raw)
+    return {key: frozenset(values) for key, values in values_by_enum.items()}
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_type_keys() -> frozenset[str]:
+    """Load known type keys declared by HOI4 schema graph."""
+    schema = load_hoi4_schema_graph()
+    return frozenset(schema.types_by_key.keys())
