@@ -151,7 +151,24 @@ def _extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...
     argument = (match.group("arg") or "").strip() or None
     lower_head = head.lower()
 
-    if lower_head in {"int", "float", "bool", "scalar", "localisation", "localisation_synced", "localisation_inline"}:
+    if lower_head in {
+        "int",
+        "float",
+        "bool",
+        "scalar",
+        "localisation",
+        "localisation_synced",
+        "localisation_inline",
+        "percentage_field",
+        "date_field",
+        "filepath",
+        "icon",
+        "variable_field",
+        "int_variable_field",
+        "value_field",
+        "int_value_field",
+        "scope_field",
+    }:
         return (RuleValueSpec(kind="primitive", raw=text, primitive=lower_head, argument=argument),)
     if lower_head == "enum":
         return (RuleValueSpec(kind="enum_ref", raw=text, argument=argument),)

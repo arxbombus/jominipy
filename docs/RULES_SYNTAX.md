@@ -17,13 +17,15 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [x] Extract per-field RHS value specs (primitive, enum ref, scope ref, type ref, value refs, block/tagged forms).
 - [x] Cross-file HOI4 schema graph/index foundation over `references/hoi4-rules/Config` (types/enums/aliases/sections/value families + top-level rule objects).
 - [x] Shared nested analysis facts for object fields (path + occurrence indexes) to support field-level checker/linter validation without ad hoc AST walks.
+- [x] Typecheck-owned primitive field constraint checks (migrated from lint) using CWTools-derived constraints.
+- [x] Primitive range enforcement for numeric primitives (`int[min..max]`, `float[min..max]`) in typecheck.
+- [x] Initial additional primitive-family checks in typecheck (`date_field`, `percentage_field`, `variable_field`, `int_variable_field`, `value_field`, `int_value_field`).
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
-  - [x] Primitive scalar type checks for `int`/`float`/`bool`.
+  - [x] Primitive scalar type checks for `int`/`float`/`bool` (historical; now owned by typecheck for correctness).
 
 ### Not implemented yet (pending)
-- [ ] Primitive range enforcement (for example `int[min..max]`, `float[min..max]`).
-- [ ] Strict handling for additional primitive families (`percentage_field`, `date_field`, `filepath`, `icon`, variable/value field variants).
+- [ ] Strict handling for remaining primitive families (`filepath`, `icon`, and stricter variable/value reference semantics).
 - [ ] Enum membership resolution and validation (`enum[key]` -> concrete allowed values).
 - [ ] Type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms).
 - [ ] Scope-resolution checks (`scope[...]`, scope stack transitions from `push_scope`/`replace_scope`).
@@ -32,7 +34,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Subtype resolution and subtype-conditional rule application.
 - [ ] Special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
 - [ ] Full schema graph wiring into resolved correctness checks (enum/type/scope/value validation in typecheck).
-- [ ] Migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
+- [ ] Complete migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
 
 ##### Table of Contents  
 - [Basic structure](#basic-structure)

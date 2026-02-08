@@ -5,13 +5,16 @@ from jominipy.diagnostics import Diagnostic
 from jominipy.lint.rules import (
     LintConfidence,
     LintDomain,
-    SemanticInvalidFieldTypeRule,
     SemanticMissingRequiredFieldRule,
 )
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
 from jominipy.rules import RuleFieldConstraint, RuleValueSpec
-from jominipy.typecheck.rules import TypecheckFacts, TypecheckRule
+from jominipy.typecheck.rules import (
+    FieldConstraintRule,
+    TypecheckFacts,
+    TypecheckRule,
+)
 
 
 def test_parse_result_analysis_facts_are_cached_across_engines() -> None:
@@ -119,9 +122,9 @@ def test_lint_cwtools_required_fields_rule_with_custom_schema() -> None:
     assert "required_field" in lint_result.diagnostics[0].message
 
 
-def test_lint_cwtools_type_rule_with_custom_schema() -> None:
+def test_typecheck_cwtools_type_rule_with_custom_schema() -> None:
     source = "technology={ level = yes }\n"
-    custom_rule = SemanticInvalidFieldTypeRule(
+    custom_rule = FieldConstraintRule(
         field_constraints_by_object={
             "technology": {
                 "level": RuleFieldConstraint(
@@ -132,11 +135,35 @@ def test_lint_cwtools_type_rule_with_custom_schema() -> None:
         },
     )
 
-    lint_result = run_lint(source, rules=(custom_rule,))
-    codes = [diagnostic.code for diagnostic in lint_result.diagnostics]
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    codes = [diagnostic.code for diagnostic in typecheck_result.diagnostics]
 
-    assert codes == ["LINT_SEMANTIC_INVALID_FIELD_TYPE"]
-    assert "technology.level" in lint_result.diagnostics[0].message
+    assert codes == ["TYPECHECK_INVALID_FIELD_TYPE"]
+    assert "technology.level" in typecheck_result.diagnostics[0].message
+
+
+def test_typecheck_primitive_ranges_with_custom_schema() -> None:
+    source = "technology={ level = 12 ratio = 0.8 }\n"
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "level": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="primitive", raw="int[0..10]", primitive="int", argument="0..10"),),
+                ),
+                "ratio": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(kind="primitive", raw="float[0.0..0.5]", primitive="float", argument="0.0..0.5"),
+                    ),
+                ),
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    codes = [diagnostic.code for diagnostic in typecheck_result.diagnostics]
+    assert codes == ["TYPECHECK_INVALID_FIELD_TYPE", "TYPECHECK_INVALID_FIELD_TYPE"]
 
 
 def test_analysis_facts_include_nested_object_fields_with_occurrence_tracking() -> None:

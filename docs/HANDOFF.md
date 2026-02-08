@@ -33,7 +33,7 @@ Every agent must perform this checklist before finishing a substantive task:
 - Active workstream: CWTools rules ingest -> normalized IR -> typed semantic enforcement.
 - Current sequencing source of truth: `docs/RULES_SYNTAX.md` -> `Implementation Checklist (jominipy status)`.
 - Immediate implementation order:
-  1. implement primitive/range correctness in typecheck (`int[...]`, `float[...]`, primitive families)
+  1. finish strict remaining primitive families in typecheck (`filepath`/`icon` and tighter variable/value reference semantics)
   2. implement resolved reference correctness (`enum[...]`, `<type_key>`, `scope[...]`)
   3. wire advanced semantics (alias/single-alias/subtype/special files)
 - Core invariants remain required:
@@ -153,8 +153,9 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 rules-parity execution plan was drafted and documented before implementation.
 - Phase 1.1 Phase A (cross-file schema graph/index foundation) is now landed.
 - Phase 1.1 Phase B (nested analysis facts for object fields) is now landed.
-- Immediate next step: execute Phase C by adding primitive/range correctness checks in typecheck and migrating corresponding hard checks out of lint.
-- Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph and new field-fact indexes.
+- Phase 1.1 Phase C (initial primitive/range correctness in typecheck + field-type correctness migration out of lint) is now landed.
+- Immediate next step: complete stricter remaining primitive-family checks (`filepath`/`icon`, tighter variable/value references).
+- Immediate next step: execute Phase D by wiring resolved-reference correctness (enum/type/scope) against the schema graph and field-fact indexes.
 - Phase 1 kickoff scope:
   1. deterministic lint rule registry and execution ordering
   2. first semantic/domain rule from CWTools-derived constraints (required fields/cardinality)

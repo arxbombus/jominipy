@@ -79,6 +79,13 @@ TYPECHECK_INCONSISTENT_VALUE_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
     category="typecheck",
 )
 
+TYPECHECK_INVALID_FIELD_TYPE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="TYPECHECK_INVALID_FIELD_TYPE",
+    message="Field value does not match CWTools type constraints.",
+    severity="warning",
+    category="typecheck",
+)
+
 LINT_SEMANTIC_INCONSISTENT_SHAPE: Final[DiagnosticSpec] = DiagnosticSpec(
     code="LINT_SEMANTIC_INCONSISTENT_SHAPE",
     message="Semantic rule: mixed value shapes should be normalized.",

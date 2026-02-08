@@ -14,6 +14,7 @@ from jominipy.diagnostics.codes import (
     PARSER_UNSUPPORTED_PARAMETER_SYNTAX,
     PARSER_UNSUPPORTED_UNMARKED_LIST,
     TYPECHECK_INCONSISTENT_VALUE_SHAPE,
+    TYPECHECK_INVALID_FIELD_TYPE,
     DiagnosticSpec,
 )
 from jominipy.diagnostics.diagnostic import Diagnostic, Severity
@@ -33,6 +34,7 @@ __all__ = [
     "PARSER_UNSUPPORTED_PARAMETER_SYNTAX",
     "PARSER_UNSUPPORTED_UNMARKED_LIST",
     "TYPECHECK_INCONSISTENT_VALUE_SHAPE",
+    "TYPECHECK_INVALID_FIELD_TYPE",
     "Diagnostic",
     "DiagnosticSpec",
     "Severity",

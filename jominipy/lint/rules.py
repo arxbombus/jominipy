@@ -7,23 +7,14 @@ import re
 from typing import Literal, Protocol
 
 from jominipy.analysis import AnalysisFacts
-from jominipy.ast import (
-    AstBlock,
-    AstScalar,
-    AstTaggedBlockValue,
-    interpret_scalar,
-)
+from jominipy.ast import AstBlock
 from jominipy.diagnostics import (
     LINT_SEMANTIC_INCONSISTENT_SHAPE,
-    LINT_SEMANTIC_INVALID_FIELD_TYPE,
     LINT_SEMANTIC_MISSING_REQUIRED_FIELD,
     LINT_STYLE_SINGLE_LINE_BLOCK,
     Diagnostic,
 )
 from jominipy.rules.semantics import (
-    RuleFieldConstraint,
-    RuleValueSpec,
-    load_hoi4_field_constraints,
     load_hoi4_required_fields,
 )
 from jominipy.text import TextRange, TextSize
@@ -127,53 +118,6 @@ class SemanticMissingRequiredFieldRule:
 
 
 @dataclass(frozen=True, slots=True)
-class SemanticInvalidFieldTypeRule:
-    """Checks scalar field values against CWTools-derived primitive constraints."""
-
-    code: str = LINT_SEMANTIC_INVALID_FIELD_TYPE.code
-    name: str = "semanticInvalidFieldType"
-    category: str = "semantic"
-    domain: LintDomain = "semantic"
-    confidence: LintConfidence = "policy"
-    field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
-
-    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
-        constraints = self.field_constraints_by_object
-        if constraints is None:
-            constraints = load_hoi4_field_constraints(include_implicit_required=False)
-
-        diagnostics: list[Diagnostic] = []
-        for key, values in facts.top_level_values.items():
-            object_constraints = constraints.get(key)
-            if object_constraints is None:
-                continue
-            for value in values:
-                if not isinstance(value, AstBlock) or not value.is_object_like:
-                    continue
-                block_object = value.to_object()
-                for field_name, field_constraint in object_constraints.items():
-                    if field_name not in block_object:
-                        continue
-                    field_value = block_object[field_name]
-                    if _matches_field_constraint(field_value, field_constraint):
-                        continue
-                    diagnostics.append(
-                        Diagnostic(
-                            code=self.code,
-                            message=(
-                                f"{LINT_SEMANTIC_INVALID_FIELD_TYPE.message} "
-                                f"`{key}.{field_name}` does not match {_format_value_specs(field_constraint.value_specs)}."
-                            ),
-                            range=_find_key_range(text, key),
-                            severity=LINT_SEMANTIC_INVALID_FIELD_TYPE.severity,
-                            hint=f"Use a value matching the CWTools schema for `{field_name}`.",
-                            category=LINT_SEMANTIC_INVALID_FIELD_TYPE.category,
-                        )
-                    )
-        return diagnostics
-
-
-@dataclass(frozen=True, slots=True)
 class StyleSingleLineMultiValueBlockRule:
     """Flags `{ ... }` blocks that contain multiple values on one line."""
 
@@ -205,7 +149,6 @@ def default_lint_rules() -> tuple[LintRule, ...]:
     rules: list[LintRule] = [
         SemanticInconsistentShapeRule(),
         SemanticMissingRequiredFieldRule(),
-        SemanticInvalidFieldTypeRule(),
         StyleSingleLineMultiValueBlockRule(),
     ]
     return tuple(sorted(rules, key=lambda rule: (rule.category, rule.code, rule.name)))
@@ -235,48 +178,3 @@ def _find_key_range(text: str, key: str) -> TextRange:
     if index < 0:
         return TextRange.empty(TextSize(0))
     return TextRange.at(TextSize(index), TextSize(len(key)))
-
-
-def _matches_field_constraint(value: object | None, constraint: RuleFieldConstraint) -> bool:
-    if not constraint.value_specs:
-        return True
-    return any(_matches_value_spec(value, spec) for spec in constraint.value_specs)
-
-
-def _matches_value_spec(value: object | None, spec: RuleValueSpec) -> bool:
-    if spec.kind in {"missing", "unknown_ref", "enum_ref", "scope_ref", "value_ref", "value_set_ref", "type_ref"}:
-        return True
-    if spec.kind == "block":
-        return isinstance(value, AstBlock)
-    if spec.kind == "tagged_block":
-        return isinstance(value, AstTaggedBlockValue)
-    if spec.kind == "error":
-        return True
-    if spec.kind != "primitive":
-        return True
-    if not isinstance(value, AstScalar):
-        return False
-    primitive = spec.primitive
-    if primitive in {"scalar", "localisation", "localisation_synced", "localisation_inline"}:
-        return True
-    parsed = interpret_scalar(value.raw_text, was_quoted=value.was_quoted)
-    if primitive == "bool":
-        return parsed.bool_value is not None
-    if primitive == "int":
-        number_value = parsed.number_value
-        return number_value is not None and isinstance(number_value, int)
-    if primitive == "float":
-        return parsed.number_value is not None
-    return True
-
-
-def _format_value_specs(specs: tuple[RuleValueSpec, ...]) -> str:
-    rendered: list[str] = []
-    for spec in specs:
-        if spec.kind == "primitive":
-            rendered.append(spec.primitive or spec.raw)
-        else:
-            rendered.append(spec.raw)
-    if not rendered:
-        return "schema constraints"
-    return " | ".join(rendered)

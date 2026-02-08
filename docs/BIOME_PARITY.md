@@ -45,7 +45,7 @@ For every parser/CST/AST feature, record:
 | Thin orchestration entrypoints | `biome_service/src/file_handlers/javascript.rs` | `jominipy/pipeline/entrypoints.py` | adapted | `run_typecheck` added; `run_check` now composes parse + typecheck + lint with one shared parse lifecycle |
 | Lint runner boundary | `biome_js_analyze/src/lib.rs`, `registry.rs` | `jominipy/lint/runner.py` | adapted | Deterministic registry scaffolds landed with semantic/style split and type-fact consumption |
 | Formatter runner boundary | `biome_js_formatter/src/lib.rs` | `jominipy/format/runner.py` | pending | CST/trivia remains source-of-truth; AST views only guide decisions |
-| Type-checker boundary | `biome_js_semantic/src/*`, `biome_js_type_info/src/*` | `jominipy/typecheck/*` | adapted | Engine scaffold + rule-domain enforcement landed (`correctness` + `sound` contracts) |
+| Type-checker boundary | `biome_js_semantic/src/*`, `biome_js_type_info/src/*` | `jominipy/typecheck/*` | adapted | Engine scaffold + rule-domain enforcement landed (`correctness` + `sound` contracts); field-type/range correctness checks now run in typecheck |
 | Rules DSL parsing + generation | `xtask/codegen`, `biome_syntax_codegen/src/*` | planned `jominipy/rules/*` + generation pipeline | pending | Separate DSL parser and normalized IR for generated models/validators |
 | Rules semantic graph + resolved constraints | `biome_js_analyze` registry/services composition + `biome_service` JS handler orchestration | `jominipy/rules/schema_graph.py` + planned `typecheck/rules.py` resolved checks | pending | Schema graph foundation landed; resolved correctness checks still pending. Keep one parse lifecycle; place hard correctness in typecheck and keep lint policy/style-focused |
 
@@ -61,6 +61,7 @@ For every parser/CST/AST feature, record:
   - approved next parity step (2026-02-08): cross-file schema graph -> nested facts -> typecheck correctness expansion -> resolved reference checks -> advanced semantics wiring.
   - update (2026-02-08): cross-file schema graph foundation is implemented and consumed by HOI4 semantic loaders.
   - update (2026-02-08): nested analysis facts for object fields are implemented in shared facts cache (`jominipy/analysis/facts.py`) for deterministic field-level rule execution.
+  - update (2026-02-08): primitive field-type/range correctness moved into typecheck (`TYPECHECK_INVALID_FIELD_TYPE`), keeping lint focused on policy/style concerns.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.
