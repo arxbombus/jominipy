@@ -55,7 +55,7 @@ Every agent must perform this checklist before finishing a substantive task:
   - alias/single-alias execution semantics are now partially implemented (`single_alias_right` expansion + `alias_match_left` membership), but not end-to-end
   - subtype execution semantics are now partially implemented (deterministic subtype matcher gating), but not full CWTools parity
   - complex enum generation is now initially implemented (path/name-tree/start_from_root materialization), but not fully parity-hardened
-  - special-file semantics are now partially integrated (`scopes` + initial `values` and `links` providers); `modifiers/localisation` and deeper link parity remain
+  - special-file semantics are now partially integrated (`scopes` + `values` + `links` + initial `modifiers`/`localisation_commands` providers + initial localisation command/scope enforcement); deeper link-chain and advanced localisation parity remain
   - non-core option semantics (`comparison`, `error_if_only_match`, reference labels) not wired
   - localisation parity remains pending and should be staged:
     - command/scope semantics from `localisation.cwt` first,
@@ -183,11 +183,20 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase F (initial complex enum materialization) is now landed.
 - Update (current): scope-context transition checks and scope-alias resolution (`this/root/from/fromfrom...` + `prev/prevprev...`) are landed in typecheck, including sibling-branch non-leakage and ambiguity diagnostics (`TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT`).
 - Phase 1.1 Phase G (initial special-file providers for `values` + `links`) is now landed.
-- Immediate next step: implement remaining special-file providers (`modifiers`, `localisation`) and deeper `links` data-source semantics.
-- Immediate follow-up: option-surface parity (`comparison`, `error_if_only_match`, reference labels), then strict precedence compatibility review for `push_scope`/`replace_scope`.
+- Update (current): Phase 1.1 special-file provider pass 2 is landed:
+  - `modifiers` + `modifier_categories` provider extraction and service wiring,
+  - `localisation_commands` provider extraction and service wiring,
+  - deeper `links` `from_data + data_source` membership gating in scope-ref resolution.
+- Update (current): localisation command/scope semantic enforcement is now landed in typecheck for localisation-typed fields.
+- Immediate next step: option-surface parity (`comparison`, `error_if_only_match`, reference labels).
+- Immediate follow-up: deeper `links` advanced-chain semantics, then strict precedence compatibility review for `push_scope`/`replace_scope`.
 - Drift correction note:
   - During subtype rollout, subtype constraints were briefly merged unconditionally into base constraints in the adapter.
   - This was corrected in the same iteration; subtype constraints now apply only through per-object-occurrence matcher resolution in typecheck.
+- Latest validation snapshot (post-links-data-source + provider pass 2):
+  - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`68 passed`)
+  - `uv run ruff check jominipy/typecheck/rules.py jominipy/typecheck/services.py jominipy/rules/adapter.py jominipy/rules/__init__.py jominipy/rules/normalize.py tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (passed)
+  - `uv run pyrefly check` (`0 errors`, `1 suppressed`)
 - Latest validation snapshot (post-alias/subtype/complex-enum phases):
   - `uv run pytest -q tests/test_rules_ingest.py tests/test_lint_typecheck_engines.py` (`60 passed`)
   - `uv run ruff check jominipy tests` (passed)

@@ -11,6 +11,7 @@ from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
 from jominipy.rules import (
     LinkDefinition,
+    LocalisationCommandDefinition,
     RuleFieldConstraint,
     RuleValueSpec,
     SubtypeMatcher,
@@ -22,11 +23,16 @@ from jominipy.typecheck.rules import (
     FieldConstraintRule,
     FieldReferenceConstraintRule,
     FieldScopeContextRule,
+    LocalisationCommandScopeRule,
     TypecheckFacts,
     TypecheckRule,
     default_typecheck_rules,
 )
-from jominipy.typecheck.services import TypecheckPolicy, TypecheckServices
+from jominipy.typecheck.services import (
+    TypecheckPolicy,
+    TypecheckServices,
+    build_typecheck_services_from_file_texts,
+)
 
 
 def test_parse_result_analysis_facts_are_cached_across_engines() -> None:
@@ -562,6 +568,7 @@ def test_typecheck_scope_ref_resolves_link_prefix_output_scope_when_input_scope_
                 link_type="both",
             )
         },
+        value_memberships_by_key={"variable": frozenset({"foo"})},
         policy=TypecheckPolicy(unresolved_reference="error"),
     )
 
@@ -604,6 +611,162 @@ def test_typecheck_scope_ref_rejects_link_prefix_when_input_scope_mismatches() -
     assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
         "TYPECHECK_INVALID_FIELD_REFERENCE"
     ]
+
+
+def test_typecheck_scope_ref_rejects_link_prefix_when_data_source_value_missing() -> None:
+    source = "technology={ target = var:missing }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="both",
+            )
+        },
+        value_memberships_by_key={"variable": frozenset({"foo"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_scope_ref_link_data_source_unresolved_defer_policy() -> None:
+    source = "technology={ target = var:foo }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="both",
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="defer"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_localisation_command_scope_allows_matching_scope() -> None:
+    source = 'technology={ desc = "[ROOT.GetWing]" }\n'
+    custom_rule = LocalisationCommandScopeRule(
+        field_constraints_by_object={
+            "technology": {
+                "desc": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(kind="primitive", raw="localisation", primitive="localisation", argument=None),
+                    ),
+                ),
+            }
+        },
+        localisation_command_definitions_by_name={
+            "GetWing": LocalisationCommandDefinition(name="GetWing", supported_scopes=("air",))
+        },
+        field_scope_constraints_by_object={"technology": {(): RuleFieldScopeConstraint(push_scope=("air",))}},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_localisation_command_scope_rejects_mismatched_scope() -> None:
+    source = 'technology={ desc = "[ROOT.GetWing]" }\n'
+    custom_rule = LocalisationCommandScopeRule(
+        field_constraints_by_object={
+            "technology": {
+                "desc": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(kind="primitive", raw="localisation", primitive="localisation", argument=None),
+                    ),
+                ),
+            }
+        },
+        localisation_command_definitions_by_name={
+            "GetWing": LocalisationCommandDefinition(name="GetWing", supported_scopes=("air",))
+        },
+        field_scope_constraints_by_object={"technology": {(): RuleFieldScopeConstraint(push_scope=("country",))}},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_localisation_command_scope_unresolved_command_defer_policy() -> None:
+    source = 'technology={ desc = "[ROOT.GetUnknown]" }\n'
+    custom_rule = LocalisationCommandScopeRule(
+        field_constraints_by_object={
+            "technology": {
+                "desc": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(kind="primitive", raw="localisation", primitive="localisation", argument=None),
+                    ),
+                ),
+            }
+        },
+        localisation_command_definitions_by_name={},
+        field_scope_constraints_by_object={"technology": {(): RuleFieldScopeConstraint(push_scope=("country",))}},
+        policy=TypecheckPolicy(unresolved_reference="defer"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_services_include_modifier_and_localisation_providers() -> None:
+    services = build_typecheck_services_from_file_texts(file_texts_by_path={})
+
+    assert "modifier" in services.alias_memberships_by_family
+    assert "annex_cost_factor" in services.alias_memberships_by_family["modifier"]
+    assert "modifier" in services.type_memberships_by_key
+    assert "annex_cost_factor" in services.type_memberships_by_key["modifier"]
+    assert "GetName" in services.localisation_command_definitions_by_name
+    assert services.localisation_command_definitions_by_name["GetName"].supported_scopes == ("any",)
 
 
 def test_typecheck_field_reference_rule_uses_dynamic_value_set_capture() -> None:

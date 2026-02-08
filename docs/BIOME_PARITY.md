@@ -71,6 +71,13 @@ For every parser/CST/AST feature, record:
   - update (2026-02-08): special-file provider pass 1 landed:
     - `values` section memberships merged into `value[...]` reference memberships,
     - `links` definitions injected into typecheck scope-reference validation for link-prefix/output-scope transitions with input-scope gating.
+  - update (2026-02-08): special-file provider pass 2 landed:
+    - `modifiers` + `modifier_categories` provider extraction wired into typecheck services,
+    - `localisation_commands` provider extraction wired into typecheck services,
+    - `links` `from_data` now enforces `data_source` membership during scope-link resolution (with unresolved defer/error policy).
+  - update (2026-02-08): localisation command/scope semantic enforcement landed:
+    - typecheck now validates localisation commands used in localisation-typed fields against `localisation_commands` scope metadata,
+    - unresolved command metadata follows typecheck unresolved-reference policy (`defer` vs `error`).
   - update (2026-02-08): clarified file-classification boundary:
     - `effects*.cwt` and `triggers*.cwt` remain regular rules files (normal ingest/adapter path), not special-file providers.
   - update (2026-02-08): localisation parity model clarified:

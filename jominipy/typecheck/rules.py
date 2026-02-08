@@ -47,6 +47,8 @@ type TypecheckConfidence = Literal["sound"]
 _VARIABLE_REF_PATTERN = re.compile(r"^[A-Za-z_@][A-Za-z0-9_:@.\-]*$")
 _RANGE_PATTERN = re.compile(r"^(?P<min>-?(?:\d+\.\d+|\d+)|-?inf)\.\.(?P<max>-?(?:\d+\.\d+|\d+)|inf)$")
 _TYPE_REF_PATTERN = re.compile(r"^(?P<prefix>.*)<(?P<type_key>[A-Za-z_][A-Za-z0-9_]*)>(?P<suffix>.*)$")
+_LOCALISATION_TOKEN_PATTERN = re.compile(r"\[(?P<body>[^\[\]]+)\]")
+_LOCALISATION_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SCOPE_ALIAS_ORDER = ("this", "from", "fromfrom", "fromfromfrom", "fromfromfromfrom")
 _PREV_ALIAS_ORDER = ("prev", "prevprev", "prevprevprev", "prevprevprevprev")
 _SCOPE_ALIAS_KEYS = frozenset((*_SCOPE_ALIAS_ORDER, *_PREV_ALIAS_ORDER, "root"))
@@ -388,6 +390,148 @@ class FieldScopeContextRule:
         return diagnostics
 
 
+@dataclass(frozen=True, slots=True)
+class LocalisationCommandScopeRule:
+    """Checks localisation command usage against `localisation_commands` scope metadata."""
+
+    code: str = TYPECHECK_INVALID_FIELD_REFERENCE.code
+    name: str = "localisationCommandScope"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
+    localisation_command_definitions_by_name: Mapping[str, object] = MappingProxyType({})
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
+        MappingProxyType({})
+    )
+    field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
+    policy: TypecheckPolicy = TypecheckPolicy()
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        constraints = self.field_constraints_by_object
+        if constraints is None:
+            constraints = load_hoi4_field_constraints(include_implicit_required=False)
+        if not self.localisation_command_definitions_by_name:
+            return []
+        scope_constraints = self.field_scope_constraints_by_object
+        if scope_constraints is None:
+            scope_constraints = load_hoi4_field_scope_constraints()
+
+        diagnostics: list[Diagnostic] = []
+        for object_key, field_constraints in constraints.items():
+            field_map = facts.object_field_map.get(object_key)
+            if not field_map:
+                continue
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            subtype_constraints = self.subtype_field_constraints_by_object.get(object_key, {})
+            field_names = set(field_constraints.keys())
+            for by_field in subtype_constraints.values():
+                field_names.update(by_field.keys())
+            for field_name in sorted(field_names):
+                field_facts = field_map.get(field_name)
+                if not field_facts:
+                    continue
+                for field_fact in field_facts:
+                    constraint = _resolve_effective_field_constraint(
+                        object_key=object_key,
+                        object_occurrence=field_fact.object_occurrence,
+                        field_name=field_name,
+                        base_constraints=field_constraints,
+                        subtype_matchers=subtype_matchers,
+                        subtype_constraints=subtype_constraints,
+                        facts=facts,
+                    )
+                    if constraint is None:
+                        continue
+                    if not _allows_localisation_primitive(constraint.value_specs):
+                        continue
+                    if not isinstance(field_fact.value, AstScalar):
+                        continue
+                    commands = _extract_localisation_commands(field_fact.value.raw_text)
+                    if not commands:
+                        continue
+                    relative_path = field_fact.path[1:]
+                    scope_context = _resolve_scope_context_before_path(
+                        relative_path=relative_path,
+                        by_path=scope_constraints.get(object_key, {}),
+                    )
+                    for command in commands:
+                        command_def = self.localisation_command_definitions_by_name.get(command)
+                        if command_def is None:
+                            if self.policy.unresolved_reference == "defer":
+                                continue
+                            diagnostics.append(
+                                Diagnostic(
+                                    code=self.code,
+                                    message=(
+                                        f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                        f"Unknown localisation command `{command}` in `{object_key}.{field_name}`."
+                                    ),
+                                    range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                    severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                    hint="Use a command declared in localisation_commands.cwt.",
+                                    category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                                )
+                            )
+                            continue
+                        supported_scopes = tuple(
+                            scope.lower() for scope in getattr(command_def, "supported_scopes", ()) if scope
+                        )
+                        if "any" in supported_scopes:
+                            continue
+                        if not supported_scopes:
+                            if self.policy.unresolved_reference == "defer":
+                                continue
+                            diagnostics.append(
+                                Diagnostic(
+                                    code=self.code,
+                                    message=(
+                                        f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                        f"Localisation command `{command}` has no resolvable scope metadata."
+                                    ),
+                                    range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                    severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                    hint="Add supported scope metadata for the command.",
+                                    category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                                )
+                            )
+                            continue
+                        if not scope_context.active_scopes:
+                            if self.policy.unresolved_reference == "defer":
+                                continue
+                            diagnostics.append(
+                                Diagnostic(
+                                    code=self.code,
+                                    message=(
+                                        f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                        f"Cannot resolve scope context for localisation command `{command}`."
+                                    ),
+                                    range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                    severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                    hint="Set scope context via push_scope/replace_scope metadata.",
+                                    category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                                )
+                            )
+                            continue
+                        if set(scope_context.active_scopes).intersection(supported_scopes):
+                            continue
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Localisation command `{command}` is not valid for scope "
+                                    f"{', '.join(sorted(scope_context.active_scopes))}."
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint=f"Use a command valid for scopes: {', '.join(supported_scopes)}.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
+        return diagnostics
+
+
 def build_typecheck_facts(facts: AnalysisFacts) -> TypecheckFacts:
     inconsistent: dict[str, tuple[str, ...]] = {}
     for key, shapes in facts.top_level_shapes.items():
@@ -415,6 +559,12 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             link_definitions_by_name=resolved_services.link_definitions_by_name,
+            policy=resolved_services.policy,
+        ),
+        LocalisationCommandScopeRule(
+            localisation_command_definitions_by_name=resolved_services.localisation_command_definitions_by_name,
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+            subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             policy=resolved_services.policy,
         ),
         FieldScopeContextRule(),
@@ -769,7 +919,8 @@ def _matches_reference_spec(
             return policy.unresolved_reference == "defer"
         if not known_scopes:
             return policy.unresolved_reference == "defer"
-        candidate = raw.strip().lower()
+        candidate_raw = raw.strip()
+        candidate = candidate_raw.lower()
         if candidate in _SCOPE_ALIAS_KEYS:
             resolved = scope_context.aliases.get(candidate)
             if resolved is None:
@@ -777,9 +928,14 @@ def _matches_reference_spec(
             candidate = resolved
         elif candidate not in known_scopes:
             link_scope = _resolve_scope_from_link_candidate(
-                candidate=candidate,
+                candidate=candidate_raw,
                 scope_context=scope_context,
                 link_definitions_by_name=link_definitions_by_name,
+                enum_values_by_key=enum_values_by_key,
+                known_type_keys=known_type_keys,
+                type_memberships_by_key=type_memberships_by_key,
+                value_memberships_by_key=value_memberships_by_key,
+                alias_memberships_by_family=alias_memberships_by_family,
                 policy=policy,
             )
             if link_scope is None:
@@ -829,11 +985,18 @@ def _resolve_scope_from_link_candidate(
     candidate: str,
     scope_context: ScopeContext,
     link_definitions_by_name: Mapping[str, LinkDefinition],
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
     policy: TypecheckPolicy,
 ) -> str | None:
     if ":" not in candidate:
         return None
-    prefix = candidate.split(":", 1)[0] + ":"
+    prefix_head, value_key = candidate.split(":", 1)
+    prefix = prefix_head.lower() + ":"
+    value_key = value_key.strip()
     matches = [link for link in link_definitions_by_name.values() if (link.prefix or "").lower() == prefix]
     if not matches:
         return None
@@ -843,6 +1006,17 @@ def _resolve_scope_from_link_candidate(
         if not output_scope:
             continue
         if not _link_input_scope_allows(link, scope_context=scope_context, policy=policy):
+            continue
+        if not _link_data_source_allows(
+            link,
+            value_key=value_key,
+            enum_values_by_key=enum_values_by_key,
+            known_type_keys=known_type_keys,
+            type_memberships_by_key=type_memberships_by_key,
+            value_memberships_by_key=value_memberships_by_key,
+            alias_memberships_by_family=alias_memberships_by_family,
+            policy=policy,
+        ):
             continue
         valid_scopes.append(output_scope)
     if not valid_scopes:
@@ -869,6 +1043,98 @@ def _link_input_scope_allows(
     return bool(set(scope_context.active_scopes).intersection(normalized))
 
 
+def _link_data_source_allows(
+    link: LinkDefinition,
+    *,
+    value_key: str,
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
+    policy: TypecheckPolicy,
+) -> bool:
+    if not link.from_data:
+        return True
+    if not value_key:
+        return False
+    if not link.data_sources:
+        return policy.unresolved_reference == "defer"
+
+    saw_unresolved = False
+    for data_source in link.data_sources:
+        match = _matches_link_data_source(
+            data_source=data_source,
+            value_key=value_key,
+            enum_values_by_key=enum_values_by_key,
+            known_type_keys=known_type_keys,
+            type_memberships_by_key=type_memberships_by_key,
+            value_memberships_by_key=value_memberships_by_key,
+            alias_memberships_by_family=alias_memberships_by_family,
+        )
+        if match is True:
+            return True
+        if match is None:
+            saw_unresolved = True
+    if saw_unresolved:
+        return policy.unresolved_reference == "defer"
+    return False
+
+
+def _matches_link_data_source(
+    *,
+    data_source: str,
+    value_key: str,
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
+) -> bool | None:
+    raw = data_source.strip()
+    if not raw:
+        return None
+    source_type = _TYPE_REF_PATTERN.fullmatch(raw)
+    if source_type is not None:
+        type_key = source_type.group("type_key")
+        if type_key not in known_type_keys:
+            return False
+        members = type_memberships_by_key.get(type_key)
+        if members is None:
+            return None
+        return value_key in members
+    if not raw.endswith("]") or "[" not in raw:
+        return None
+    family, argument = raw.split("[", 1)
+    family = family.strip().lower()
+    argument = argument[:-1].strip()
+    if not argument:
+        return None
+    if family == "value":
+        members = value_memberships_by_key.get(argument)
+        if members is None:
+            return None
+        return value_key in members
+    if family == "type":
+        if argument not in known_type_keys:
+            return False
+        members = type_memberships_by_key.get(argument)
+        if members is None:
+            return None
+        return value_key in members
+    if family == "enum":
+        members = enum_values_by_key.get(argument)
+        if members is None:
+            return None
+        return value_key in members
+    if family in {"alias_match_left", "alias_name", "alias"}:
+        members = alias_memberships_by_family.get(argument)
+        if members is None:
+            return None
+        return value_key in members
+    return None
+
+
 def _build_icon_candidate(*, raw_value: str, argument: str | None) -> str:
     if argument is None:
         return f"{raw_value}.dds"
@@ -876,6 +1142,36 @@ def _build_icon_candidate(*, raw_value: str, argument: str | None) -> str:
     if not prefix:
         return f"{raw_value}.dds"
     return f"{prefix}/{raw_value}.dds"
+
+
+def _allows_localisation_primitive(specs: tuple[RuleValueSpec, ...]) -> bool:
+    return any(
+        spec.kind == "primitive" and spec.primitive in {"localisation", "localisation_synced", "localisation_inline"}
+        for spec in specs
+    )
+
+
+def _extract_localisation_commands(raw_text: str) -> tuple[str, ...]:
+    text = _strip_scalar_quotes(raw_text)
+    commands: list[str] = []
+    seen: set[str] = set()
+    for match in _LOCALISATION_TOKEN_PATTERN.finditer(text):
+        body = match.group("body").strip()
+        if not body or "?" in body or ":" in body:
+            continue
+        parts = [part.strip() for part in body.split(".") if part.strip()]
+        if not parts:
+            continue
+        candidate = parts[-1]
+        if _LOCALISATION_IDENTIFIER_PATTERN.fullmatch(candidate) is None:
+            continue
+        if len(parts) < 2 and not candidate.startswith("Get"):
+            continue
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        commands.append(candidate)
+    return tuple(commands)
 
 
 def _strip_scalar_quotes(raw_text: str) -> str:

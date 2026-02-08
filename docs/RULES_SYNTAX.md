@@ -67,8 +67,11 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Special-file semantic ingestion hardening:
   - [x] `links.cwt` initial provider + scope-ref link-prefix/output-scope validation wiring.
   - [x] `values` section initial provider merged into `value[...]` memberships.
-  - [ ] `modifiers` and `localisation` providers.
-  - [ ] deeper `links` parity (data-source and advanced chain semantics).
+  - [x] initial `modifiers` + `modifier_categories` provider extraction and service wiring.
+  - [x] initial `localisation_commands` provider extraction and service wiring.
+  - [x] deeper `links` pass: `from_data + data_source` membership gating in scope-ref resolution.
+  - [x] initial localisation command/scope compatibility enforcement in typecheck from `localisation_commands`.
+  - [ ] deeper `links` advanced-chain semantics beyond current prefix+input+output+data-source checks.
 - [ ] Option-surface parity for non-core options used by CWTools execution (`comparison`, `error_if_only_match`, reference labels).
 - [ ] Compatibility decision for strict CWTools `push_scope`/`replace_scope` precedence behavior.
 

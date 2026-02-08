@@ -35,6 +35,7 @@ _SECTION_KEYS = {
     "scopes",
     "folders",
     "modifiers",
+    "modifier_categories",
     "localisation_commands",
     "list_merge_optimisations",
 }

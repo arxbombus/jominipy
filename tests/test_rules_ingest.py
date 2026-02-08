@@ -2,6 +2,8 @@ from pathlib import Path
 
 from jominipy.rules import (
     LinkDefinition,
+    LocalisationCommandDefinition,
+    ModifierDefinition,
     RuleFieldConstraint,
     RuleSchemaGraph,
     RuleValueSpec,
@@ -11,6 +13,8 @@ from jominipy.rules import (
     build_expanded_field_constraints,
     build_field_constraints_by_object,
     build_link_definitions,
+    build_localisation_command_definitions,
+    build_modifier_definitions,
     build_required_fields_by_object,
     build_schema_graph,
     build_subtype_field_constraints_by_object,
@@ -415,4 +419,54 @@ def test_links_definitions_are_extracted_from_links_section() -> None:
         from_data=True,
         data_sources=("value[variable]",),
         link_type="both",
+    )
+
+
+def test_modifier_definitions_are_extracted_with_supported_scopes() -> None:
+    source = """modifier_categories = {
+    country = { supported_scopes = { country } }
+    state = { supported_scopes = { state country } }
+}
+modifiers = {
+    tax_bonus = country
+    unrest = state
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-modifiers.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    modifiers = build_modifier_definitions(schema)
+    assert modifiers["tax_bonus"] == ModifierDefinition(
+        name="tax_bonus",
+        category="country",
+        supported_scopes=("country",),
+    )
+    assert modifiers["unrest"] == ModifierDefinition(
+        name="unrest",
+        category="state",
+        supported_scopes=("state", "country"),
+    )
+
+
+def test_localisation_command_definitions_are_extracted() -> None:
+    source = """localisation_commands = {
+    GetName = any
+    GetWing = { air country }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-localisation-commands.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    commands = build_localisation_command_definitions(schema)
+    assert commands["GetName"] == LocalisationCommandDefinition(
+        name="GetName",
+        supported_scopes=("any",),
+    )
+    assert commands["GetWing"] == LocalisationCommandDefinition(
+        name="GetWing",
+        supported_scopes=("air", "country"),
     )

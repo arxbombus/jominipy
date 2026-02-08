@@ -72,6 +72,23 @@ class LinkDefinition:
     link_type: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ModifierDefinition:
+    """Normalized modifier definition from special-file `modifiers` section."""
+
+    name: str
+    category: str | None = None
+    supported_scopes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class LocalisationCommandDefinition:
+    """Normalized command definition from special-file `localisation_commands` section."""
+
+    name: str
+    supported_scopes: tuple[str, ...] = ()
+
+
 def build_alias_members_by_family(schema: RuleSchemaGraph) -> dict[str, frozenset[str]]:
     """Build alias-family membership maps from `alias[family:name]` declarations."""
     aliases: dict[str, set[str]] = {}
@@ -270,6 +287,55 @@ def build_link_definitions(schema: RuleSchemaGraph) -> dict[str, LinkDefinition]
     return links
 
 
+def build_modifier_definitions(schema: RuleSchemaGraph) -> dict[str, ModifierDefinition]:
+    """Build modifier definitions from `modifiers` and `modifier_categories` sections."""
+    supported_scopes_by_category = _collect_modifier_category_scopes(schema)
+    modifiers: dict[str, ModifierDefinition] = {}
+    for section in schema.sections_by_key.get("modifiers", ()):
+        statement = section.statement
+        if statement.value.kind != "block":
+            continue
+        for child in statement.value.block:
+            if child.kind != "key_value" or child.key is None:
+                continue
+            name = child.key.strip()
+            if not name:
+                continue
+            category = None
+            if child.value.kind == "scalar":
+                raw_category = (child.value.text or "").strip().strip('"')
+                if raw_category:
+                    category = raw_category
+            scopes = tuple(scope.lower() for scope in supported_scopes_by_category.get(category or "", ()))
+            modifiers[name] = ModifierDefinition(name=name, category=category, supported_scopes=scopes)
+    return modifiers
+
+
+def build_localisation_command_definitions(
+    schema: RuleSchemaGraph,
+) -> dict[str, LocalisationCommandDefinition]:
+    """Build localisation command definitions from `localisation_commands` section."""
+    commands: dict[str, LocalisationCommandDefinition] = {}
+    for section in schema.sections_by_key.get("localisation_commands", ()):
+        statement = section.statement
+        if statement.value.kind != "block":
+            continue
+        for child in statement.value.block:
+            if child.kind != "key_value" or child.key is None:
+                continue
+            name = child.key.strip()
+            if not name:
+                continue
+            scopes = _extract_scope_list(child)
+            if not scopes:
+                scopes = ("any",)
+            commands[name] = LocalisationCommandDefinition(
+                name=name,
+                supported_scopes=tuple(scope.lower() for scope in scopes),
+            )
+    return commands
+
+
 @lru_cache(maxsize=1)
 def load_hoi4_values_memberships_by_key() -> dict[str, frozenset[str]]:
     """Load special-file values memberships from HOI4 schema."""
@@ -282,6 +348,20 @@ def load_hoi4_link_definitions() -> dict[str, LinkDefinition]:
     """Load special-file link definitions from HOI4 schema."""
     schema = load_hoi4_schema_graph()
     return build_link_definitions(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_modifier_definitions() -> dict[str, ModifierDefinition]:
+    """Load special-file modifier definitions from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_modifier_definitions(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_localisation_command_definitions() -> dict[str, LocalisationCommandDefinition]:
+    """Load special-file localisation command definitions from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_localisation_command_definitions(schema)
 
 
 def build_subtype_matchers_by_object(schema: RuleSchemaGraph) -> dict[str, tuple[SubtypeMatcher, ...]]:
@@ -358,6 +438,28 @@ def _find_scalar_child(statements: tuple[RuleStatement, ...], key: str) -> str |
             continue
         return (statement.value.text or "").strip().strip('"')
     return None
+
+
+def _collect_modifier_category_scopes(schema: RuleSchemaGraph) -> dict[str, tuple[str, ...]]:
+    scopes_by_category: dict[str, tuple[str, ...]] = {}
+    for section in schema.sections_by_key.get("modifier_categories", ()):
+        statement = section.statement
+        if statement.value.kind != "block":
+            continue
+        for category_entry in statement.value.block:
+            if category_entry.kind != "key_value" or category_entry.key is None:
+                continue
+            category = category_entry.key.strip()
+            if not category or category_entry.value.kind != "block":
+                continue
+            scopes: tuple[str, ...] = ()
+            for child in category_entry.value.block:
+                if child.kind != "key_value" or child.key != "supported_scopes":
+                    continue
+                scopes = _extract_scope_list(child)
+                break
+            scopes_by_category[category] = scopes
+    return scopes_by_category
 
 
 def _collect_link_options(

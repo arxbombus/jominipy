@@ -6,7 +6,12 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal, Mapping
 
-from jominipy.rules.adapter import LinkDefinition, SubtypeMatcher
+from jominipy.rules.adapter import (
+    LinkDefinition,
+    LocalisationCommandDefinition,
+    ModifierDefinition,
+    SubtypeMatcher,
+)
 from jominipy.rules.semantics import RuleFieldConstraint
 from jominipy.typecheck.assets import AssetRegistry, NullAssetRegistry
 
@@ -52,6 +57,12 @@ class TypecheckServices:
     link_definitions_by_name: Mapping[str, LinkDefinition] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    modifier_definitions_by_name: Mapping[str, ModifierDefinition] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    localisation_command_definitions_by_name: Mapping[str, LocalisationCommandDefinition] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
 
 def build_typecheck_services_from_file_texts(
@@ -70,6 +81,8 @@ def build_typecheck_services_from_file_texts(
         load_hoi4_field_constraints,
         load_hoi4_known_scopes,
         load_hoi4_link_definitions,
+        load_hoi4_localisation_command_definitions,
+        load_hoi4_modifier_definitions,
         load_hoi4_schema_graph,
         load_hoi4_subtype_field_constraints_by_object,
         load_hoi4_subtype_matchers_by_object,
@@ -89,6 +102,18 @@ def build_typecheck_services_from_file_texts(
     )
     special_value_memberships = load_hoi4_values_memberships_by_key()
     merged_value_memberships = _merge_memberships(value_memberships, special_value_memberships)
+    modifier_definitions = load_hoi4_modifier_definitions()
+    localisation_command_definitions = load_hoi4_localisation_command_definitions()
+    modifier_names = frozenset(modifier_definitions.keys())
+    alias_memberships = _merge_family_memberships(
+        load_hoi4_alias_members_by_family(),
+        family="modifier",
+        values=modifier_names,
+    )
+    type_memberships = _merge_memberships(
+        memberships,
+        {"modifier": modifier_names},
+    )
     complex_enum_memberships = build_complex_enum_values_from_file_texts(
         file_texts_by_path=file_texts_by_path,
         definitions_by_key=load_hoi4_complex_enum_definitions(),
@@ -96,15 +121,17 @@ def build_typecheck_services_from_file_texts(
     return TypecheckServices(
         asset_registry=asset_registry or NullAssetRegistry(),
         policy=policy or TypecheckPolicy(),
-        type_memberships_by_key=MappingProxyType(memberships),
+        type_memberships_by_key=MappingProxyType(type_memberships),
         value_memberships_by_key=MappingProxyType(merged_value_memberships),
         special_value_memberships_by_key=MappingProxyType(special_value_memberships),
         known_scopes=load_hoi4_known_scopes(),
         enum_memberships_by_key=MappingProxyType(complex_enum_memberships),
-        alias_memberships_by_family=MappingProxyType(load_hoi4_alias_members_by_family()),
+        alias_memberships_by_family=MappingProxyType(alias_memberships),
         subtype_matchers_by_object=MappingProxyType(load_hoi4_subtype_matchers_by_object()),
         subtype_field_constraints_by_object=MappingProxyType(load_hoi4_subtype_field_constraints_by_object()),
         link_definitions_by_name=MappingProxyType(load_hoi4_link_definitions()),
+        modifier_definitions_by_name=MappingProxyType(modifier_definitions),
+        localisation_command_definitions_by_name=MappingProxyType(localisation_command_definitions),
     )
 
 
@@ -171,3 +198,16 @@ def _merge_memberships(
     for key, values in right.items():
         merged.setdefault(key, set()).update(values)
     return {key: frozenset(values) for key, values in merged.items()}
+
+
+def _merge_family_memberships(
+    memberships: Mapping[str, frozenset[str]],
+    *,
+    family: str,
+    values: frozenset[str],
+) -> dict[str, frozenset[str]]:
+    merged = dict(memberships)
+    existing = set(merged.get(family, frozenset()))
+    existing.update(values)
+    merged[family] = frozenset(existing)
+    return merged
