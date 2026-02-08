@@ -57,6 +57,7 @@ def run_typecheck(
     parse: JominiParseResult | None = None,
     rules: tuple[TypecheckRule, ...] | None = None,
     services: TypecheckServices | None = None,
+    project_root: str | None = None,
 ) -> TypecheckRunResult:
     """Run type checking over one Jomini parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
@@ -65,6 +66,7 @@ def run_typecheck(
         parse=resolved_parse,
         rules=rules,
         services=services,
+        project_root=project_root,
     )
 
 
@@ -86,10 +88,17 @@ def run_check(
     *,
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
+    services: TypecheckServices | None = None,
+    project_root: str | None = None,
 ) -> CheckRunResult:
     """Run parse + typecheck + lint checks over one Jomini parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
-    typecheck_result = _run_typecheck(resolved_parse.source_text, parse=resolved_parse)
+    typecheck_result = _run_typecheck(
+        resolved_parse.source_text,
+        parse=resolved_parse,
+        services=services,
+        project_root=project_root,
+    )
     lint_result = _run_lint(
         resolved_parse.source_text,
         parse=resolved_parse,

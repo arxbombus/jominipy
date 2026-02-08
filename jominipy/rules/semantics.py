@@ -12,6 +12,7 @@ from jominipy.rules.schema_graph import load_hoi4_schema_graph
 
 _SIMPLE_FIELD_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SCALAR_PATTERN = re.compile(r"^(?P<head>[^\[\]]+)(?:\[(?P<arg>.*)\])?$")
+_TYPE_REF_INLINE_PATTERN = re.compile(r"^.*<(?P<type_key>[A-Za-z_][A-Za-z0-9_]*)>.*$")
 
 type RuleValueSpecKind = Literal[
     "primitive",
@@ -140,8 +141,15 @@ def _extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...
     if not text:
         return (RuleValueSpec(kind="unknown_ref", raw=text),)
 
-    if text.startswith("<") and text.endswith(">") and len(text) > 2:
-        return (RuleValueSpec(kind="type_ref", raw=text, argument=text[1:-1].strip()),)
+    inline_type_match = _TYPE_REF_INLINE_PATTERN.match(text)
+    if inline_type_match is not None:
+        return (
+            RuleValueSpec(
+                kind="type_ref",
+                raw=text,
+                argument=inline_type_match.group("type_key").strip(),
+            ),
+        )
 
     match = _SCALAR_PATTERN.match(text)
     if match is None:
@@ -253,3 +261,35 @@ def load_hoi4_type_keys() -> frozenset[str]:
     """Load known type keys declared by HOI4 schema graph."""
     schema = load_hoi4_schema_graph()
     return frozenset(schema.types_by_key.keys())
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_known_scopes() -> frozenset[str]:
+    """Load known scope aliases from HOI4 `scopes` declarations."""
+    schema = load_hoi4_schema_graph()
+    scope_names: set[str] = set()
+    for section in schema.sections_by_key.get("scopes", ()):
+        statement = section.statement
+        if statement.value.kind != "block":
+            continue
+        for entry in statement.value.block:
+            if entry.kind != "key_value" or entry.key is None:
+                continue
+            if entry.key:
+                scope_names.add(entry.key.strip().lower())
+            if entry.value.kind != "block":
+                continue
+            for child in entry.value.block:
+                if child.kind != "key_value" or child.key != "aliases":
+                    continue
+                if child.value.kind != "block":
+                    continue
+                for alias_value in child.value.block:
+                    if alias_value.kind != "value":
+                        continue
+                    if alias_value.value.kind != "scalar":
+                        continue
+                    alias_text = (alias_value.value.text or "").strip().strip('"').lower()
+                    if alias_text:
+                        scope_names.add(alias_text)
+    return frozenset(scope_names)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import is_dataclass, replace
 
 from jominipy.diagnostics import Diagnostic
 from jominipy.parser import ParseMode, ParserOptions, parse_result
@@ -14,7 +15,10 @@ from jominipy.typecheck.rules import (
     default_typecheck_rules,
     validate_typecheck_rules,
 )
-from jominipy.typecheck.services import TypecheckServices
+from jominipy.typecheck.services import (
+    TypecheckServices,
+    build_typecheck_services_from_project_root,
+)
 
 
 def run_typecheck(
@@ -25,18 +29,26 @@ def run_typecheck(
     parse: JominiParseResult | None = None,
     rules: Sequence[TypecheckRule] | None = None,
     services: TypecheckServices | None = None,
+    project_root: str | None = None,
 ) -> TypecheckRunResult:
     """Run type checking from a single parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
     analysis_facts = resolved_parse.analysis_facts()
     type_facts = build_typecheck_facts(analysis_facts)
 
-    resolved_services = services if services is not None else TypecheckServices()
+    if services is not None:
+        resolved_services = services
+    elif project_root is not None:
+        resolved_services = build_typecheck_services_from_project_root(project_root=project_root)
+    else:
+        resolved_services = TypecheckServices()
     resolved_rules = (
         tuple(rules)
         if rules is not None
         else default_typecheck_rules(services=resolved_services)
     )
+    if rules is not None and (services is not None or project_root is not None):
+        resolved_rules = _bind_services_to_rules(resolved_rules, services=resolved_services)
     validate_typecheck_rules(resolved_rules)
 
     diagnostics = list(resolved_parse.diagnostics)
@@ -74,3 +86,31 @@ def _sort_diagnostics(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
             diagnostic.message,
         ),
     )
+
+
+def _bind_services_to_rules(
+    rules: tuple[TypecheckRule, ...],
+    *,
+    services: TypecheckServices,
+) -> tuple[TypecheckRule, ...]:
+    bound: list[TypecheckRule] = []
+    for rule in rules:
+        if not is_dataclass(rule):
+            bound.append(rule)
+            continue
+        replacements: dict[str, object] = {}
+        if hasattr(rule, "asset_registry"):
+            replacements["asset_registry"] = services.asset_registry
+        if hasattr(rule, "policy"):
+            replacements["policy"] = services.policy
+        if hasattr(rule, "type_memberships_by_key") and not getattr(rule, "type_memberships_by_key"):
+            replacements["type_memberships_by_key"] = services.type_memberships_by_key
+        if hasattr(rule, "value_memberships_by_key") and not getattr(rule, "value_memberships_by_key"):
+            replacements["value_memberships_by_key"] = services.value_memberships_by_key
+        if hasattr(rule, "known_scopes") and not getattr(rule, "known_scopes"):
+            replacements["known_scopes"] = services.known_scopes
+        if replacements:
+            bound.append(replace(rule, **replacements))
+        else:
+            bound.append(rule)
+    return tuple(bound)

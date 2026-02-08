@@ -30,6 +30,7 @@ from jominipy.rules.semantics import (
     build_required_fields_by_object,
     load_hoi4_enum_values,
     load_hoi4_field_constraints,
+    load_hoi4_known_scopes,
     load_hoi4_required_fields,
     load_hoi4_type_keys,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "extract_type_definitions",
     "load_hoi4_enum_values",
     "load_hoi4_field_constraints",
+    "load_hoi4_known_scopes",
     "load_hoi4_required_fields",
     "load_hoi4_schema_graph",
     "load_hoi4_type_keys",

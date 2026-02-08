@@ -7,6 +7,7 @@ from jominipy.rules import (
     build_field_constraints_by_object,
     build_required_fields_by_object,
     load_hoi4_enum_values,
+    load_hoi4_known_scopes,
     load_hoi4_required_fields,
     load_hoi4_schema_graph,
     load_hoi4_type_keys,
@@ -220,3 +221,10 @@ def test_hoi4_enum_values_and_type_keys_load_from_schema_graph() -> None:
     assert "add_factor" in enum_values
     assert "add" in enum_values["add_factor"]
     assert "spriteType" in type_keys
+
+
+def test_hoi4_known_scopes_load_from_schema_graph() -> None:
+    scopes = load_hoi4_known_scopes()
+
+    assert "country" in scopes
+    assert "state" in scopes

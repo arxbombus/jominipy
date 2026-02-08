@@ -25,6 +25,10 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [x] Initial resolved-reference correctness in typecheck:
   - [x] `enum[...]` membership checks from cross-file HOI4 schema graph.
   - [x] `<type_key>` key existence checks from schema + generic injected type-membership sets (schema-driven `type[...]` discovery; `<spriteType>` is one instance, not a special case).
+  - [x] Initial prefixed/suffixed `<type_key>` matching support (`prefix_<type>_suffix` forms).
+  - [x] Initial `scope[...]` reference-value checks against known scope aliases.
+  - [x] Initial dynamic `value_set[...]` capture + `value[...]` membership checks from parsed field facts.
+  - [x] Project-root type-membership auto-wiring path for typecheck/check entrypoints.
 - [x] First semantic enforcement in lint:
   - [x] Missing required field diagnostics.
   - [x] Primitive scalar type checks for `int`/`float`/`bool` (historical; now owned by typecheck for correctness).
@@ -32,8 +36,8 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 ### Not implemented yet (pending)
 - [ ] Strict handling for remaining primitive-family semantics (tighter variable/value reference semantics and project-policy decisions for unresolved asset lookups).
 - [ ] Full type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms) against project-discovered members.
-- [ ] Scope-resolution checks (`scope[...]`, scope stack transitions from `push_scope`/`replace_scope`).
-- [ ] Value/value_set dynamic capture and validation.
+- [ ] Full scope-resolution checks (`scope[...]`, scope stack transitions from `push_scope`/`replace_scope`).
+- [ ] Full value/value_set dynamic validation across files and execution scopes.
 - [ ] Alias/single-alias expansion and validation wiring.
 - [ ] Subtype resolution and subtype-conditional rule application.
 - [ ] Special-file semantics (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.

@@ -58,3 +58,20 @@ def build_typecheck_services_from_file_texts(
         policy=policy or TypecheckPolicy(),
         type_memberships_by_key=MappingProxyType(memberships),
     )
+
+
+def build_typecheck_services_from_project_root(
+    *,
+    project_root: str,
+    asset_registry: AssetRegistry | None = None,
+    policy: TypecheckPolicy | None = None,
+) -> TypecheckServices:
+    """Build generic type-membership services from project-root script files."""
+    from jominipy.rules import collect_file_texts_under_root
+
+    file_texts = collect_file_texts_under_root(project_root)
+    return build_typecheck_services_from_file_texts(
+        file_texts_by_path=file_texts,
+        asset_registry=asset_registry,
+        policy=policy,
+    )

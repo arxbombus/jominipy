@@ -58,10 +58,19 @@ def run_check(
     *,
     mode: ParseMode | None = None,
     parse: JominiParseResult | None = None,
+    services: TypecheckServices | None = None,
+    project_root: str | None = None,
 ) -> CheckRunResult:
     from jominipy.pipeline.entrypoints import run_check as _run_check
 
-    return _run_check(text, options=options, mode=mode, parse=parse)
+    return _run_check(
+        text,
+        options=options,
+        mode=mode,
+        parse=parse,
+        services=services,
+        project_root=project_root,
+    )
 
 
 def run_typecheck(
@@ -72,6 +81,7 @@ def run_typecheck(
     parse: JominiParseResult | None = None,
     rules: tuple[TypecheckRule, ...] | None = None,
     services: TypecheckServices | None = None,
+    project_root: str | None = None,
 ) -> TypecheckRunResult:
     from jominipy.pipeline.entrypoints import run_typecheck as _run_typecheck
 
@@ -82,6 +92,7 @@ def run_typecheck(
         parse=parse,
         rules=rules,
         services=services,
+        project_root=project_root,
     )
 
 

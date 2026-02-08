@@ -364,6 +364,79 @@ def test_typecheck_field_reference_rule_unresolved_policy_controls_outcome() -> 
     ]
 
 
+def test_typecheck_field_reference_rule_supports_prefixed_suffixed_type_refs() -> None:
+    source = "technology={ modifier = pre_my_modifier_suf }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "modifier": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(
+                            kind="type_ref",
+                            raw="pre_<opinion_modifier>_suf",
+                            argument="opinion_modifier",
+                        ),
+                    ),
+                ),
+            }
+        },
+        known_type_keys=frozenset({"opinion_modifier"}),
+        type_memberships_by_key={"opinion_modifier": frozenset({"other_modifier"})},
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_field_reference_rule_validates_scope_ref() -> None:
+    source = "technology={ who = state }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
+def test_typecheck_field_reference_rule_uses_dynamic_value_set_capture() -> None:
+    source = "technology={ set_key = alpha has_key = beta }\ntechnology={ has_key = alpha }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "set_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="value_set_ref", raw="value_set[test_key]", argument="test_key"),),
+                ),
+                "has_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="value_ref", raw="value[test_key]", argument="test_key"),),
+                ),
+            }
+        },
+        known_type_keys=frozenset(),
+        value_memberships_by_key={},
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    # `has_key = beta` should fail while `has_key = alpha` should pass.
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+
+
 def test_default_typecheck_rules_accept_injected_services_policy() -> None:
     services = TypecheckServices(policy=TypecheckPolicy(unresolved_asset="error"))
 

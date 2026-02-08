@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from jominipy.parser import ParseMode, parse_result
 from jominipy.pipeline import run_check, run_format, run_lint, run_typecheck
+from jominipy.rules import RuleFieldConstraint, RuleValueSpec
+from jominipy.typecheck.rules import FieldReferenceConstraintRule
 
 
 def test_run_lint_reuses_provided_parse_result() -> None:
@@ -53,3 +57,45 @@ def test_run_typecheck_reuses_provided_parse_result() -> None:
 
     assert result.parse is parsed
     assert result.diagnostics == parsed.diagnostics
+
+
+def test_run_typecheck_project_root_auto_builds_type_memberships(tmp_path: Path) -> None:
+    interface_dir = tmp_path / "game" / "interface"
+    interface_dir.mkdir(parents=True, exist_ok=True)
+    (interface_dir / "example.gfx").write_text(
+        "spriteTypes={\n"
+        '  spriteType={ name="GFX_focus_test" textureFile="gfx/interface/x.dds" }\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    source = "technology={ icon = GFX_missing }\n"
+    rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "icon": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="type_ref", raw="<spriteType>", argument="spriteType"),),
+                ),
+            }
+        },
+        known_type_keys=frozenset({"spriteType"}),
+    )
+    result = run_typecheck(source, rules=(rule,), project_root=str(tmp_path))
+
+    assert [diagnostic.code for diagnostic in result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+
+
+def test_run_check_accepts_typecheck_services_parameters(tmp_path: Path) -> None:
+    interface_dir = tmp_path / "game" / "interface"
+    interface_dir.mkdir(parents=True, exist_ok=True)
+    (interface_dir / "example.gfx").write_text(
+        "spriteTypes={\n"
+        '  spriteType={ name="GFX_focus_test" textureFile="gfx/interface/x.dds" }\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    source = "technology={ icon = GFX_missing }\n"
+
+    result = run_check(source, project_root=str(tmp_path))
+
+    assert result.parse.source_text == source

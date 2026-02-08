@@ -25,6 +25,7 @@ from jominipy.rules.semantics import (
     RuleValueSpec,
     load_hoi4_enum_values,
     load_hoi4_field_constraints,
+    load_hoi4_known_scopes,
     load_hoi4_type_keys,
 )
 from jominipy.text import TextRange, TextSize
@@ -40,6 +41,7 @@ type TypecheckConfidence = Literal["sound"]
 
 _VARIABLE_REF_PATTERN = re.compile(r"^[A-Za-z_@][A-Za-z0-9_:@.\-]*$")
 _RANGE_PATTERN = re.compile(r"^(?P<min>-?(?:\d+\.\d+|\d+)|-?inf)\.\.(?P<max>-?(?:\d+\.\d+|\d+)|inf)$")
+_TYPE_REF_PATTERN = re.compile(r"^(?P<prefix>.*)<(?P<type_key>[A-Za-z_][A-Za-z0-9_]*)>(?P<suffix>.*)$")
 _REFERENCE_SPEC_KINDS = {
     "enum_ref",
     "scope_ref",
@@ -180,6 +182,9 @@ class FieldReferenceConstraintRule:
             constraints = load_hoi4_field_constraints(include_implicit_required=False)
         enum_values = self.enum_values_by_key or load_hoi4_enum_values()
         known_type_keys = self.known_type_keys or load_hoi4_type_keys()
+        known_scopes = self.known_scopes or load_hoi4_known_scopes()
+        dynamic_values = _build_dynamic_value_memberships(facts=facts, constraints=constraints)
+        merged_value_memberships = _merge_membership_maps(self.value_memberships_by_key, dynamic_values)
 
         diagnostics: list[Diagnostic] = []
         for object_key, field_constraints in constraints.items():
@@ -213,8 +218,8 @@ class FieldReferenceConstraintRule:
                         enum_values_by_key=enum_values,
                         known_type_keys=known_type_keys,
                         type_memberships_by_key=self.type_memberships_by_key,
-                        value_memberships_by_key=self.value_memberships_by_key,
-                        known_scopes=self.known_scopes,
+                        value_memberships_by_key=merged_value_memberships,
+                        known_scopes=known_scopes,
                         policy=self.policy,
                     ):
                         continue
@@ -497,6 +502,10 @@ def _matches_reference_spec(
         return raw in allowed
 
     if spec.kind == "type_ref":
+        raw_pattern = spec.raw.strip()
+        parsed_pattern = _TYPE_REF_PATTERN.match(raw_pattern)
+        if parsed_pattern is not None:
+            key = parsed_pattern.group("type_key").strip()
         if not key:
             return policy.unresolved_reference == "defer"
         if key not in known_type_keys:
@@ -504,12 +513,25 @@ def _matches_reference_spec(
         members = type_memberships_by_key.get(key)
         if members is None:
             return policy.unresolved_reference == "defer"
-        return raw in members
+        if parsed_pattern is None:
+            return raw in members
+        prefix = parsed_pattern.group("prefix")
+        suffix = parsed_pattern.group("suffix")
+        if not raw.startswith(prefix):
+            return False
+        if suffix and not raw.endswith(suffix):
+            return False
+        inner = raw[len(prefix) :]
+        if suffix:
+            inner = inner[: -len(suffix)]
+        return inner in members
 
     if spec.kind == "scope_ref":
+        if not key:
+            return policy.unresolved_reference == "defer"
         if not known_scopes:
             return policy.unresolved_reference == "defer"
-        return raw in known_scopes
+        return raw.strip().lower() == key.lower()
 
     if spec.kind in {"value_ref", "value_set_ref"}:
         if not key:
@@ -587,3 +609,44 @@ def _format_value_specs(specs: tuple[RuleValueSpec, ...]) -> str:
     if not rendered:
         return "schema constraints"
     return " | ".join(rendered)
+
+
+def _build_dynamic_value_memberships(
+    *,
+    facts: AnalysisFacts,
+    constraints: dict[str, dict[str, RuleFieldConstraint]],
+) -> Mapping[str, frozenset[str]]:
+    collected: dict[str, set[str]] = {}
+    for object_key, field_constraints in constraints.items():
+        field_map = facts.object_field_map.get(object_key)
+        if not field_map:
+            continue
+        for field_name, constraint in field_constraints.items():
+            keys = {
+                (spec.argument or "").strip()
+                for spec in constraint.value_specs
+                if spec.kind == "value_set_ref" and (spec.argument or "").strip()
+            }
+            if not keys:
+                continue
+            for field_fact in field_map.get(field_name, ()):
+                if not isinstance(field_fact.value, AstScalar):
+                    continue
+                value = _strip_scalar_quotes(field_fact.value.raw_text.strip())
+                if not value:
+                    continue
+                for key in keys:
+                    collected.setdefault(key, set()).add(value)
+    return {key: frozenset(values) for key, values in collected.items()}
+
+
+def _merge_membership_maps(
+    left: Mapping[str, frozenset[str]],
+    right: Mapping[str, frozenset[str]],
+) -> Mapping[str, frozenset[str]]:
+    merged: dict[str, set[str]] = {}
+    for key, values in left.items():
+        merged.setdefault(key, set()).update(values)
+    for key, values in right.items():
+        merged.setdefault(key, set()).update(values)
+    return {key: frozenset(values) for key, values in merged.items()}
