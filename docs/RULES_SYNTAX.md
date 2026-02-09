@@ -39,6 +39,9 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] Added ambiguity detection for conflicting `replace_scope` alias mappings (`TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT`).
   - [x] Initial dynamic `value_set[...]` capture + `value[...]` membership checks from parsed field facts (with `value_set[...]` treated as setter/register, not membership-check target).
   - [x] Project-root type-membership auto-wiring path for typecheck/check entrypoints.
+  - [x] End-to-end typecheck coverage for `enum[...]` against CWTools fixture-derived complex enums (valid + invalid cases).
+  - [x] Quoted `enum[...]` declaration semantics are enforced in typecheck (`"enum[key]"` requires quoted values and validates membership).
+  - [x] Complex-enum path filter edge coverage (`path_strict` + `path_extension`) via end-to-end typecheck tests.
 
 ### Temporary compatibility note
 - Current `project_root` auto-binding for custom-injected typecheck rules (especially custom `value_set/value` constraints) exists primarily to keep test coverage and local experimentation stable.

@@ -1605,6 +1605,8 @@ def _matches_reference_spec(
 ) -> bool:
     if not isinstance(value, AstScalar):
         return False
+    if spec.require_quotes and not _is_double_quoted_scalar(value.raw_text):
+        return False
     raw = _strip_scalar_quotes(value.raw_text)
     key = (spec.argument or "").strip()
 
@@ -1688,6 +1690,11 @@ def _matches_reference_spec(
         return raw in members
 
     return False
+
+
+def _is_double_quoted_scalar(raw: str) -> bool:
+    stripped = raw.strip()
+    return len(stripped) >= 2 and stripped[0] == '"' and stripped[-1] == '"'
 
 
 def _build_filepath_candidate(*, raw_value: str, argument: str | None) -> str:

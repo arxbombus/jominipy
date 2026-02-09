@@ -42,6 +42,7 @@ class RuleValueSpec:
     raw: str
     primitive: str | None = None
     argument: str | None = None
+    require_quotes: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,19 +220,23 @@ def extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...]
     if not text:
         return (RuleValueSpec(kind="unknown_ref", raw=text),)
 
-    inline_type_match = _TYPE_REF_INLINE_PATTERN.match(text)
+    quoted = _is_double_quoted(text)
+    parse_text = _strip_double_quotes(text) if quoted else text
+
+    inline_type_match = _TYPE_REF_INLINE_PATTERN.match(parse_text)
     if inline_type_match is not None:
         return (
             RuleValueSpec(
                 kind="type_ref",
-                raw=text,
+                raw=parse_text,
                 argument=inline_type_match.group("type_key").strip(),
+                require_quotes=quoted,
             ),
         )
 
-    match = _SCALAR_PATTERN.match(text)
+    match = _SCALAR_PATTERN.match(parse_text)
     if match is None:
-        return (RuleValueSpec(kind="unknown_ref", raw=text),)
+        return (RuleValueSpec(kind="unknown_ref", raw=parse_text),)
 
     head = match.group("head").strip()
     argument = (match.group("arg") or "").strip() or None
@@ -255,21 +260,28 @@ def extract_value_specs(expression: RuleExpression) -> tuple[RuleValueSpec, ...]
         "int_value_field",
         "scope_field",
     }:
-        return (RuleValueSpec(kind="primitive", raw=text, primitive=lower_head, argument=argument),)
+        return (RuleValueSpec(kind="primitive", raw=parse_text, primitive=lower_head, argument=argument),)
     if lower_head == "enum":
-        return (RuleValueSpec(kind="enum_ref", raw=text, argument=argument),)
+        return (RuleValueSpec(kind="enum_ref", raw=parse_text, argument=argument, require_quotes=quoted),)
     if lower_head == "scope":
-        return (RuleValueSpec(kind="scope_ref", raw=text, argument=argument),)
+        return (RuleValueSpec(kind="scope_ref", raw=parse_text, argument=argument, require_quotes=quoted),)
     if lower_head == "value":
-        return (RuleValueSpec(kind="value_ref", raw=text, argument=argument),)
+        return (RuleValueSpec(kind="value_ref", raw=parse_text, argument=argument, require_quotes=quoted),)
     if lower_head == "value_set":
-        return (RuleValueSpec(kind="value_set_ref", raw=text, argument=argument),)
+        return (RuleValueSpec(kind="value_set_ref", raw=parse_text, argument=argument, require_quotes=quoted),)
     if lower_head == "alias_match_left":
-        return (RuleValueSpec(kind="alias_match_left_ref", raw=text, argument=argument),)
+        return (
+            RuleValueSpec(
+                kind="alias_match_left_ref",
+                raw=parse_text,
+                argument=argument,
+                require_quotes=quoted,
+            ),
+        )
     if lower_head == "single_alias_right":
-        return (RuleValueSpec(kind="single_alias_ref", raw=text, argument=argument),)
+        return (RuleValueSpec(kind="single_alias_ref", raw=parse_text, argument=argument, require_quotes=quoted),)
 
-    return (RuleValueSpec(kind="unknown_ref", raw=text, argument=argument),)
+    return (RuleValueSpec(kind="unknown_ref", raw=parse_text, argument=argument),)
 
 
 def _merge_value_specs(
@@ -277,14 +289,22 @@ def _merge_value_specs(
     right: tuple[RuleValueSpec, ...],
 ) -> tuple[RuleValueSpec, ...]:
     merged: list[RuleValueSpec] = list(left)
-    seen = {(spec.kind, spec.raw, spec.primitive, spec.argument) for spec in left}
+    seen = {(spec.kind, spec.raw, spec.primitive, spec.argument, spec.require_quotes) for spec in left}
     for spec in right:
-        key = (spec.kind, spec.raw, spec.primitive, spec.argument)
+        key = (spec.kind, spec.raw, spec.primitive, spec.argument, spec.require_quotes)
         if key in seen:
             continue
         seen.add(key)
         merged.append(spec)
     return tuple(merged)
+
+
+def _is_double_quoted(text: str) -> bool:
+    return len(text) >= 2 and text[0] == '"' and text[-1] == '"'
+
+
+def _strip_double_quotes(text: str) -> str:
+    return text[1:-1] if _is_double_quoted(text) else text
 
 
 @lru_cache(maxsize=1)

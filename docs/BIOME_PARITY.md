@@ -82,6 +82,11 @@ For every parser/CST/AST feature, record:
     - subtype evaluation now follows declaration-order first-match semantics (single active subtype),
     - subtype `push_scope` now feeds scope-context resolution in reference, scope-context, and localisation-command scope rules.
   - update (2026-02-08): complex enum materialization landed (project-file scan + name-tree traversal + `start_from_root`/path filtering) and is injected into enum reference checks through services.
+  - update (2026-02-09 current): complex-enum parity hardening coverage expanded:
+    - added end-to-end typecheck tests against CWTools STL fixture-derived complex enums (valid + invalid cases),
+    - added quoted declaration parity for `"enum[key]"` with quoted-value enforcement in reference matching,
+    - added filter-edge test coverage for `path_strict` + `path_extension`,
+    - added default typecheck rule-stack execution coverage for enum-reference service wiring.
   - update (2026-02-08): special-file provider pass 1 landed:
     - `values` section memberships merged into `value[...]` reference memberships,
     - `links` definitions injected into typecheck scope-reference validation for link-prefix/output-scope transitions with input-scope gating.
