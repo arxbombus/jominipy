@@ -29,15 +29,29 @@ Last updated: 2026-02-09
 - Modifiers edge-policy hardening landed:
   - new `ModifierScopeRule` enforces `modifier_categories` scope compatibility for `alias_match_left[modifier]` references,
   - strict unresolved policy now reports known modifiers with missing/empty scope metadata.
+- Links edge-policy hardening landed:
+  - `scope_ref` link-chain resolution now enforces `link_type` compatibility (`scope`/`both` only),
+  - prefixed and multi-segment link chains with `link_type = value` now deterministically reject in strict mode.
+- Links primitive-reference hardening landed:
+  - `value_field`/`int_value_field` and `variable_field`/`int_variable_field` now enforce links `link_type` compatibility (`value`/`both`) when values resolve through known link chains,
+  - this validation reuses scope-context + data-source checks from the links adapter surface.
+- Links continuation pass 2 (2026-02-09T11:05:11Z) landed:
+  - primitive link compatibility is now wired through the default typecheck rule stack (not only ad hoc custom-rule tests),
+  - targeted regression coverage was extended to lock `value_field` and `variable_field` prefixed-link behavior.
 
 ## Latest Validation Snapshot
 - `uv run pyrefly check` (`0 errors`)
-- `uv run pytest -q tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py` (`58 passed`)
 - `uv run ruff check jominipy/typecheck/rules.py tests/typecheck/test_reference_rules.py` (pass)
+- `uv run pytest -q tests/typecheck/test_reference_rules.py` (`33 passed`)
 
 ## Exact Next Step
-1. Continue remaining `links` long-tail edge-policy parity hardening.
-2. Keep targeted rules/typecheck parity suites in the regression loop while landing `links` changes.
+1. Finish `links` parity only for unresolved/unknown chain-policy edges:
+   - missing link definitions,
+   - missing `output_scope`,
+   - unresolved `data_source` membership,
+   - strict (`error`) vs defer behavior consistency.
+2. Add focused regression tests for each edge above in `tests/typecheck/test_reference_rules.py`.
+3. Re-run targeted validation (`ruff`, `pyrefly`, `pytest` for `test_reference_rules.py`) and then mark `links` as complete.
 
 ## Notes
 - Historical logs are archived under `docs/archive/`.

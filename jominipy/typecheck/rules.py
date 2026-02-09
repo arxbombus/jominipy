@@ -146,6 +146,13 @@ class FieldConstraintRule:
     subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
         MappingProxyType({})
     )
+    enum_values_by_key: Mapping[str, frozenset[str]] | None = None
+    known_type_keys: frozenset[str] | None = None
+    type_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
+    value_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
+    alias_memberships_by_family: Mapping[str, frozenset[str]] = MappingProxyType({})
+    link_definitions_by_name: Mapping[str, LinkDefinition] = MappingProxyType({})
+    field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
     asset_registry: AssetRegistry = NullAssetRegistry()
     policy: TypecheckPolicy = TypecheckPolicy()
 
@@ -153,6 +160,15 @@ class FieldConstraintRule:
         constraints = self.field_constraints_by_object
         if constraints is None:
             constraints = load_hoi4_field_constraints(include_implicit_required=False)
+        enum_values = self.enum_values_by_key or load_hoi4_enum_values()
+        if self.enum_values_by_key is not None:
+            enum_values = _merge_membership_maps(load_hoi4_enum_values(), self.enum_values_by_key)
+        known_type_keys = self.known_type_keys or load_hoi4_type_keys()
+        scope_constraints = self.field_scope_constraints_by_object
+        if scope_constraints is None:
+            scope_constraints = load_hoi4_field_scope_constraints()
+        dynamic_values = _build_dynamic_value_memberships(facts=facts, constraints=constraints)
+        merged_value_memberships = _merge_membership_maps(self.value_memberships_by_key, dynamic_values)
 
         diagnostics: list[Diagnostic] = []
         for object_key, field_constraints in constraints.items():
@@ -185,10 +201,34 @@ class FieldConstraintRule:
                     )
                     if not primitive_specs:
                         continue
+                    relative_path = field_fact.path[1:]
+                    scope_context = _resolve_scope_context_before_path(
+                        relative_path=relative_path,
+                        by_path=scope_constraints.get(object_key, {}),
+                        initial_push_scopes=_resolve_subtype_push_scopes(
+                            object_key=object_key,
+                            object_occurrence=field_fact.object_occurrence,
+                            matchers=subtype_matchers,
+                            facts=facts,
+                        ),
+                    )
+                    if scope_context.ambiguity is not None:
+                        continue
                     if _matches_value_specs(
                         field_fact.value,
                         primitive_specs,
                         asset_registry=self.asset_registry,
+                        policy=self.policy,
+                    ) and _matches_value_link_semantics_if_applicable(
+                        field_fact.value,
+                        primitive_specs,
+                        scope_context=scope_context,
+                        link_definitions_by_name=self.link_definitions_by_name,
+                        enum_values_by_key=enum_values,
+                        known_type_keys=known_type_keys,
+                        type_memberships_by_key=self.type_memberships_by_key,
+                        value_memberships_by_key=merged_value_memberships,
+                        alias_memberships_by_family=self.alias_memberships_by_family,
                         policy=self.policy,
                     ):
                         continue
@@ -1350,6 +1390,11 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             asset_registry=resolved_services.asset_registry,
             subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
+            enum_values_by_key=resolved_services.enum_memberships_by_key,
+            type_memberships_by_key=resolved_services.type_memberships_by_key,
+            value_memberships_by_key=resolved_services.value_memberships_by_key,
+            alias_memberships_by_family=resolved_services.alias_memberships_by_family,
+            link_definitions_by_name=resolved_services.link_definitions_by_name,
             policy=resolved_services.policy,
         ),
         FieldReferenceConstraintRule(
@@ -1901,6 +1946,7 @@ def _resolve_scope_from_link_candidate(
             value_memberships_by_key=value_memberships_by_key,
             alias_memberships_by_family=alias_memberships_by_family,
             policy=policy,
+            resolution_kind="scope",
         )
         if next_scopes is None:
             return None
@@ -1911,6 +1957,98 @@ def _resolve_scope_from_link_candidate(
     if len(unique) != 1:
         return None
     return unique[0]
+
+
+def _matches_value_link_semantics_if_applicable(
+    value: object | None,
+    specs: tuple[RuleValueSpec, ...],
+    *,
+    scope_context: ScopeContext,
+    link_definitions_by_name: Mapping[str, LinkDefinition],
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
+    policy: TypecheckPolicy,
+) -> bool:
+    if not isinstance(value, AstScalar):
+        return True
+    if not any(
+        spec.kind == "primitive"
+        and (spec.primitive or "") in {"value_field", "int_value_field", "variable_field", "int_variable_field"}
+        for spec in specs
+    ):
+        return True
+    candidate = _strip_scalar_quotes(value.raw_text).strip()
+    if not candidate:
+        return True
+    parsed = interpret_scalar(value.raw_text, was_quoted=value.was_quoted)
+    if parsed.number_value is not None:
+        return True
+    if not _candidate_starts_with_known_link(candidate, link_definitions_by_name=link_definitions_by_name):
+        return True
+    return _resolve_value_from_link_candidate(
+        candidate=candidate,
+        scope_context=scope_context,
+        link_definitions_by_name=link_definitions_by_name,
+        enum_values_by_key=enum_values_by_key,
+        known_type_keys=known_type_keys,
+        type_memberships_by_key=type_memberships_by_key,
+        value_memberships_by_key=value_memberships_by_key,
+        alias_memberships_by_family=alias_memberships_by_family,
+        policy=policy,
+    )
+
+
+def _candidate_starts_with_known_link(
+    candidate: str,
+    *,
+    link_definitions_by_name: Mapping[str, LinkDefinition],
+) -> bool:
+    first_segment = candidate.split(".", 1)[0].strip()
+    if not first_segment:
+        return False
+    if ":" in first_segment:
+        prefix = first_segment.split(":", 1)[0].strip().lower() + ":"
+        return any((link.prefix or "").strip().lower() == prefix for link in link_definitions_by_name.values())
+    name = first_segment.lower()
+    return any(link.name.lower() == name for link in link_definitions_by_name.values())
+
+
+def _resolve_value_from_link_candidate(
+    *,
+    candidate: str,
+    scope_context: ScopeContext,
+    link_definitions_by_name: Mapping[str, LinkDefinition],
+    enum_values_by_key: Mapping[str, frozenset[str]],
+    known_type_keys: frozenset[str],
+    type_memberships_by_key: Mapping[str, frozenset[str]],
+    value_memberships_by_key: Mapping[str, frozenset[str]],
+    alias_memberships_by_family: Mapping[str, frozenset[str]],
+    policy: TypecheckPolicy,
+) -> bool:
+    segments = tuple(part.strip() for part in candidate.split(".") if part.strip())
+    if not segments:
+        return False
+    active_scopes = set(scope_context.active_scopes)
+    for segment in segments:
+        next_scopes = _resolve_link_segment_scopes(
+            segment=segment,
+            active_scopes=frozenset(active_scopes),
+            link_definitions_by_name=link_definitions_by_name,
+            enum_values_by_key=enum_values_by_key,
+            known_type_keys=known_type_keys,
+            type_memberships_by_key=type_memberships_by_key,
+            value_memberships_by_key=value_memberships_by_key,
+            alias_memberships_by_family=alias_memberships_by_family,
+            policy=policy,
+            resolution_kind="value",
+        )
+        if next_scopes is None:
+            return False
+        active_scopes = set(next_scopes)
+    return bool(active_scopes)
 
 
 def _resolve_link_segment_scopes(
@@ -1924,6 +2062,7 @@ def _resolve_link_segment_scopes(
     value_memberships_by_key: Mapping[str, frozenset[str]],
     alias_memberships_by_family: Mapping[str, frozenset[str]],
     policy: TypecheckPolicy,
+    resolution_kind: Literal["scope", "value"],
 ) -> tuple[str, ...] | None:
     valid_scopes: set[str] = set()
     saw_unresolved = False
@@ -1935,6 +2074,8 @@ def _resolve_link_segment_scopes(
         if not matches:
             return None
         for link in matches:
+            if not _link_supports_resolution(link, resolution_kind=resolution_kind):
+                continue
             output_scope = (link.output_scope or "").strip().lower()
             if not output_scope:
                 saw_unresolved = True
@@ -1958,6 +2099,8 @@ def _resolve_link_segment_scopes(
         if not matches:
             return None
         for link in matches:
+            if not _link_supports_resolution(link, resolution_kind=resolution_kind):
+                continue
             output_scope = (link.output_scope or "").strip().lower()
             if not output_scope:
                 saw_unresolved = True
@@ -1973,6 +2116,13 @@ def _resolve_link_segment_scopes(
     if saw_unresolved and policy.unresolved_reference == "defer":
         return None
     return None
+
+
+def _link_supports_resolution(link: LinkDefinition, *, resolution_kind: Literal["scope", "value"]) -> bool:
+    link_type = (link.link_type or "").strip().lower()
+    if resolution_kind == "scope":
+        return link_type in {"", "scope", "both"}
+    return link_type in {"value", "both"}
 
 
 def _link_input_scope_allows(

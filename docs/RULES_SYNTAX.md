@@ -84,6 +84,8 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] deeper `links` pass: `from_data + data_source` membership gating in scope-ref resolution.
   - [x] initial localisation command/scope compatibility enforcement in typecheck from `localisation_commands`.
   - [x] deeper `links` advanced-chain semantics (multi-segment chain resolution with per-segment input-scope and data-source gating).
+  - [x] `links` `link_type` scope-compatibility enforcement for `scope_ref` execution (`scope`/`both` accepted, `value` rejected).
+  - [x] `links` `link_type` value-compatibility enforcement for primitive value references (`value_field`/`int_value_field`/`variable_field`/`int_variable_field`). 
 - [x] Option-surface parity for non-core options used by CWTools execution (`comparison`, `error_if_only_match`, reference labels).
 - [x] Compatibility decision for strict CWTools `push_scope`/`replace_scope` precedence behavior (`push_scope` takes precedence at same declaration path; `replace_scope` is skipped there).
 

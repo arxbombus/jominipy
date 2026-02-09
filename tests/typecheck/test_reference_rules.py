@@ -937,3 +937,181 @@ def test_typecheck_scope_ref_resolves_chain_with_prefixed_link_segment() -> None
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))
     assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_rejects_prefixed_link_segment_with_value_link_type() -> None:
+    source = "technology={ target = var:foo }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="value",
+            )
+        },
+        value_memberships_by_key={"variable": frozenset({"foo"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+
+
+def test_typecheck_scope_ref_rejects_chain_segment_with_value_link_type() -> None:
+    source = "technology={ target = owner.capital }\n"
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "target": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[state]", argument="state"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country", "state"}),
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "owner": LinkDefinition(
+                name="owner",
+                output_scope="country",
+                input_scopes=("state",),
+            ),
+            "capital": LinkDefinition(
+                name="capital",
+                output_scope="state",
+                input_scopes=("country", "state"),
+                link_type="value",
+            ),
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+
+
+def test_typecheck_value_field_accepts_prefixed_link_with_value_link_type() -> None:
+    source = "technology={ trigger_value = var:foo }\n"
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "trigger_value": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="primitive", raw="value_field", primitive="value_field"),),
+                ),
+            }
+        },
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="both",
+            ),
+        },
+        value_memberships_by_key={"variable": frozenset({"foo"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_value_field_rejects_prefixed_link_with_scope_link_type() -> None:
+    source = "technology={ trigger_value = var:foo }\n"
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "trigger_value": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="primitive", raw="value_field", primitive="value_field"),),
+                ),
+            }
+        },
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="scope",
+            ),
+        },
+        value_memberships_by_key={"variable": frozenset({"foo"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_TYPE"]
+
+
+def test_typecheck_variable_field_rejects_prefixed_link_with_scope_link_type() -> None:
+    source = "technology={ trigger_value = var:foo }\n"
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={
+            "technology": {
+                "trigger_value": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="primitive", raw="variable_field", primitive="variable_field"),),
+                ),
+            }
+        },
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        link_definitions_by_name={
+            "var": LinkDefinition(
+                name="var",
+                output_scope="country",
+                input_scopes=("state",),
+                prefix="var:",
+                from_data=True,
+                data_sources=("value[variable]",),
+                link_type="scope",
+            ),
+        },
+        value_memberships_by_key={"variable": frozenset({"foo"})},
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_TYPE"]

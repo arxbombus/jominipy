@@ -115,6 +115,15 @@ For every parser/CST/AST feature, record:
   - update (2026-02-08): links advanced-chain parity pass landed:
     - scope-link resolution now supports multi-segment chains (`a.b.c`) and mixed prefixed segments (`owner.var:foo`),
     - each segment enforces input-scope gating and `from_data + data_source` membership rules.
+  - update (2026-02-09 current): links edge-policy hardening landed:
+    - scope-link resolution now enforces `link_type` compatibility for `scope_ref` checks (`scope`/`both` accepted, `value` rejected),
+    - behavior is locked by prefixed and mixed-chain regression coverage.
+  - update (2026-02-09 current): links primitive-reference hardening landed:
+    - `value_field`/`int_value_field` and `variable_field`/`int_variable_field` now enforce `link_type` compatibility for known link-chain references (`value`/`both`),
+    - validation runs on the same scope-context/data-source semantics used by scope-link resolution.
+  - update (2026-02-09 current, pass 2 @ 11:05Z): links primitive execution wiring landed:
+    - primitive link compatibility checks are now part of default typecheck service wiring,
+    - targeted regressions lock prefixed-link behavior on primitive value/variable fields.
   - update (2026-02-08): strict scope precedence compatibility landed:
     - when a declaration has both `push_scope` and `replace_scope`, typecheck now applies CWTools precedence (`push_scope` wins; same-path `replace_scope` skipped),
     - precedence behavior is locked by explicit regression tests.
