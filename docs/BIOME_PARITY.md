@@ -102,6 +102,10 @@ For every parser/CST/AST feature, record:
     - localisation parse results now preserve full-file trivia/comments in a separate trivia channel for formatter-phase round-trip safety,
     - invalid child-column structure uses dedicated `LOCALISATION_INVALID_COLUMN` diagnostics,
     - lexer micro-optimization experiment is intentionally parked (`jominipy/lexer/faster_lexer.py`) and not active runtime behavior during current rules-parity phase.
+  - update (2026-02-09 current, Stage 2a initial):
+    - added compact localisation key-provider artifacts (`key -> locale-bitmask`) for rules/typecheck paths to avoid carrying full localisation entry payloads when only key existence/coverage checks are needed,
+    - wired provider into typecheck services and added deterministic key existence/coverage rule execution (`localisation_coverage` policy: `any`/`all`),
+    - retained full localisation parse/index payloads for formatter/open-localisation workflows as intentional separate path.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

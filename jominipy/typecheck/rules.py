@@ -23,6 +23,7 @@ from jominipy.diagnostics import (
     TYPECHECK_RULE_CUSTOM_ERROR,
     Diagnostic,
 )
+from jominipy.localisation.keys import LocalisationKeyProvider
 from jominipy.rules.adapter import LinkDefinition, SubtypeMatcher
 from jominipy.rules.semantics import (
     RuleFieldConstraint,
@@ -392,6 +393,105 @@ class FieldScopeContextRule:
 
 
 @dataclass(frozen=True, slots=True)
+class LocalisationKeyExistenceRule:
+    """Checks localisation key references against loaded localisation keys."""
+
+    code: str = TYPECHECK_INVALID_FIELD_REFERENCE.code
+    name: str = "localisationKeyExists"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
+    localisation_key_provider: LocalisationKeyProvider = LocalisationKeyProvider()
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
+        MappingProxyType({})
+    )
+    policy: TypecheckPolicy = TypecheckPolicy()
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        constraints = self.field_constraints_by_object
+        if constraints is None:
+            constraints = load_hoi4_field_constraints(include_implicit_required=False)
+        if self.localisation_key_provider.is_empty:
+            return []
+
+        diagnostics: list[Diagnostic] = []
+        for object_key, field_constraints in constraints.items():
+            field_map = facts.object_field_map.get(object_key)
+            if not field_map:
+                continue
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            subtype_constraints = self.subtype_field_constraints_by_object.get(object_key, {})
+            field_names = set(field_constraints.keys())
+            for by_field in subtype_constraints.values():
+                field_names.update(by_field.keys())
+            for field_name in sorted(field_names):
+                field_facts = field_map.get(field_name)
+                if not field_facts:
+                    continue
+                for field_fact in field_facts:
+                    constraint = _resolve_effective_field_constraint(
+                        object_key=object_key,
+                        object_occurrence=field_fact.object_occurrence,
+                        field_name=field_name,
+                        base_constraints=field_constraints,
+                        subtype_matchers=subtype_matchers,
+                        subtype_constraints=subtype_constraints,
+                        facts=facts,
+                    )
+                    if constraint is None:
+                        continue
+                    if not _allows_localisation_key_primitive(constraint.value_specs):
+                        continue
+                    if not isinstance(field_fact.value, AstScalar):
+                        continue
+                    key = _extract_localisation_key_reference(field_fact.value.raw_text)
+                    if key is None:
+                        continue
+                    if not self.localisation_key_provider.has_key(key):
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Unknown localisation key `{key}` in `{object_key}.{field_name}`."
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Define this key in localisation files or change the reference.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
+                        continue
+                    if self.policy.localisation_coverage == "any":
+                        continue
+                    required_locales = (
+                        self.policy.localisation_required_locales
+                        if self.policy.localisation_required_locales
+                        else self.localisation_key_provider.locales
+                    )
+                    missing = self.localisation_key_provider.missing_locales_for_key(
+                        key,
+                        required_locales=required_locales,
+                    )
+                    if missing:
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Localisation key `{key}` is missing locales: {', '.join(missing)}."
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Add missing locale entries or switch localisation coverage policy.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
+        return diagnostics
+
+
+@dataclass(frozen=True, slots=True)
 class LocalisationCommandScopeRule:
     """Checks localisation command usage against `localisation_commands` scope metadata."""
 
@@ -684,6 +784,12 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             link_definitions_by_name=resolved_services.link_definitions_by_name,
             asset_registry=resolved_services.asset_registry,
+            policy=resolved_services.policy,
+        ),
+        LocalisationKeyExistenceRule(
+            localisation_key_provider=resolved_services.localisation_key_provider,
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+            subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             policy=resolved_services.policy,
         ),
         LocalisationCommandScopeRule(
@@ -1332,6 +1438,26 @@ def _allows_localisation_primitive(specs: tuple[RuleValueSpec, ...]) -> bool:
         spec.kind == "primitive" and spec.primitive in {"localisation", "localisation_synced", "localisation_inline"}
         for spec in specs
     )
+
+
+def _allows_localisation_key_primitive(specs: tuple[RuleValueSpec, ...]) -> bool:
+    return any(
+        spec.kind == "primitive" and spec.primitive in {"localisation", "localisation_synced"}
+        for spec in specs
+    )
+
+
+def _extract_localisation_key_reference(raw_text: str) -> str | None:
+    text = _strip_scalar_quotes(raw_text).strip()
+    if not text:
+        return None
+    if "[" in text or "]" in text:
+        return None
+    if text.startswith("$"):
+        return None
+    if any(ch.isspace() for ch in text):
+        return None
+    return text
 
 
 def _extract_localisation_commands(raw_text: str) -> tuple[str, ...]:

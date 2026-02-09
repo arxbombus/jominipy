@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import cast
 
 from jominipy.analysis import AnalysisFacts
@@ -6,6 +7,10 @@ from jominipy.lint.rules import (
     LintConfidence,
     LintDomain,
     SemanticMissingRequiredFieldRule,
+)
+from jominipy.localisation import (
+    build_localisation_key_provider,
+    parse_localisation_text,
 )
 from jominipy.parser import parse_result
 from jominipy.pipeline import run_lint, run_typecheck
@@ -25,6 +30,7 @@ from jominipy.typecheck.rules import (
     FieldReferenceConstraintRule,
     FieldScopeContextRule,
     LocalisationCommandScopeRule,
+    LocalisationKeyExistenceRule,
     TypecheckFacts,
     TypecheckRule,
     default_typecheck_rules,
@@ -33,6 +39,7 @@ from jominipy.typecheck.services import (
     TypecheckPolicy,
     TypecheckServices,
     build_typecheck_services_from_file_texts,
+    build_typecheck_services_from_project_root,
 )
 
 
@@ -874,6 +881,66 @@ def test_typecheck_localisation_command_scope_unresolved_command_defer_policy() 
     assert typecheck_result.diagnostics == []
 
 
+def test_typecheck_localisation_key_exists_rule_reports_missing_key() -> None:
+    source = "technology={ desc = missing_loc_key }\n"
+    provider = build_localisation_key_provider(
+        (
+            parse_localisation_text('l_english:\nknown_loc_key:0 "Known"\n'),
+            parse_localisation_text('l_german:\nknown_loc_key:0 "Bekannt"\n'),
+        )
+    )
+    custom_rule = LocalisationKeyExistenceRule(
+        field_constraints_by_object={
+            "technology": {
+                "desc": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(kind="primitive", raw="localisation", primitive="localisation", argument=None),
+                    ),
+                ),
+            }
+        },
+        localisation_key_provider=provider,
+        policy=TypecheckPolicy(localisation_coverage="any"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+    assert "Unknown localisation key `missing_loc_key`" in typecheck_result.diagnostics[0].message
+
+
+def test_typecheck_localisation_key_exists_rule_reports_missing_locale_coverage() -> None:
+    source = "technology={ desc = known_loc_key }\n"
+    provider = build_localisation_key_provider(
+        (
+            parse_localisation_text('l_english:\nknown_loc_key:0 "Known"\n'),
+            parse_localisation_text("l_german:\n"),
+        )
+    )
+    custom_rule = LocalisationKeyExistenceRule(
+        field_constraints_by_object={
+            "technology": {
+                "desc": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(kind="primitive", raw="localisation", primitive="localisation", argument=None),
+                    ),
+                ),
+            }
+        },
+        localisation_key_provider=provider,
+        policy=TypecheckPolicy(localisation_coverage="all"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == [
+        "TYPECHECK_INVALID_FIELD_REFERENCE"
+    ]
+    assert "missing locales: german" in typecheck_result.diagnostics[0].message
+
+
 def test_typecheck_error_if_only_match_emits_custom_diagnostic_when_value_matches() -> None:
     source = "technology={ target = var:foo }\n"
     custom_rule = ErrorIfOnlyMatchRule(
@@ -926,6 +993,20 @@ def test_typecheck_services_include_modifier_and_localisation_providers() -> Non
     assert "annex_cost_factor" in services.type_memberships_by_key["modifier"]
     assert "GetName" in services.localisation_command_definitions_by_name
     assert services.localisation_command_definitions_by_name["GetName"].supported_scopes == ("any",)
+    assert services.localisation_key_provider.is_empty
+
+
+def test_typecheck_services_from_project_root_include_localisation_key_provider(tmp_path: Path) -> None:
+    (tmp_path / "common").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "common" / "test.txt").write_text("technology={}\n", encoding="utf-8")
+    loc_file = tmp_path / "localisation" / "english" / "test_l_english.yml"
+    loc_file.parent.mkdir(parents=True, exist_ok=True)
+    loc_file.write_text('\ufeffl_english:\nmy_focus_key:0 "My Focus"\n', encoding="utf-8")
+
+    services = build_typecheck_services_from_project_root(project_root=str(tmp_path))
+
+    assert not services.localisation_key_provider.is_empty
+    assert services.localisation_key_provider.has_key("my_focus_key")
 
 
 def test_typecheck_field_reference_rule_uses_dynamic_value_set_capture() -> None:

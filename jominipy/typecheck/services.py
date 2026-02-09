@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal, Mapping
 
+from jominipy.localisation.keys import (
+    LocalisationKeyProvider,
+    load_localisation_key_provider_from_project_root,
+)
 from jominipy.rules.adapter import (
     LinkDefinition,
     LocalisationCommandDefinition,
@@ -24,6 +28,8 @@ class TypecheckPolicy:
 
     unresolved_asset: UnresolvedPolicy = "defer"
     unresolved_reference: UnresolvedPolicy = "defer"
+    localisation_coverage: Literal["any", "all"] = "any"
+    localisation_required_locales: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +68,9 @@ class TypecheckServices:
     )
     localisation_command_definitions_by_name: Mapping[str, LocalisationCommandDefinition] = field(
         default_factory=lambda: MappingProxyType({})
+    )
+    localisation_key_provider: LocalisationKeyProvider = field(
+        default_factory=LocalisationKeyProvider
     )
 
 
@@ -132,6 +141,7 @@ def build_typecheck_services_from_file_texts(
         link_definitions_by_name=MappingProxyType(load_hoi4_link_definitions()),
         modifier_definitions_by_name=MappingProxyType(modifier_definitions),
         localisation_command_definitions_by_name=MappingProxyType(localisation_command_definitions),
+        localisation_key_provider=LocalisationKeyProvider(),
     )
 
 
@@ -145,10 +155,26 @@ def build_typecheck_services_from_project_root(
     from jominipy.rules import collect_file_texts_under_root
 
     file_texts = collect_file_texts_under_root(project_root)
-    return build_typecheck_services_from_file_texts(
+    services = build_typecheck_services_from_file_texts(
         file_texts_by_path=file_texts,
         asset_registry=asset_registry,
         policy=policy,
+    )
+    return TypecheckServices(
+        asset_registry=services.asset_registry,
+        policy=services.policy,
+        type_memberships_by_key=services.type_memberships_by_key,
+        value_memberships_by_key=services.value_memberships_by_key,
+        special_value_memberships_by_key=services.special_value_memberships_by_key,
+        known_scopes=services.known_scopes,
+        enum_memberships_by_key=services.enum_memberships_by_key,
+        alias_memberships_by_family=services.alias_memberships_by_family,
+        subtype_matchers_by_object=services.subtype_matchers_by_object,
+        subtype_field_constraints_by_object=services.subtype_field_constraints_by_object,
+        link_definitions_by_name=services.link_definitions_by_name,
+        modifier_definitions_by_name=services.modifier_definitions_by_name,
+        localisation_command_definitions_by_name=services.localisation_command_definitions_by_name,
+        localisation_key_provider=load_localisation_key_provider_from_project_root(project_root=project_root),
     )
 
 

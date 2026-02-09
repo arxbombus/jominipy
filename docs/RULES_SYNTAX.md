@@ -559,7 +559,8 @@ This file contains a block `localisation_commands ` that contains a list of loca
 #### Localisation implementation sequencing (jominipy plan)
 - Stage 1: implement command/scope compatibility from `localisation.cwt` (`localisation_commands`, optional localisation-link metadata) as semantic adapter artifacts consumed by typecheck.
 - Stage 2: add localisation YAML ingestion for key existence/coverage checks (for required localisation keys and reference validation).
-- Stage 2a (planned): introduce `LocalisationKeyProvider` for compact key-level queries in rules/lint/typecheck paths; keep full parse payload loading as on-demand behavior.
+- Stage 2a (initial landed): introduce `LocalisationKeyProvider` for compact key-level queries in rules/lint/typecheck paths; keep full parse payload loading as on-demand behavior.
+- Stage 2a follow-up: extend provider-backed diagnostics/policies and complete remaining localisation semantic parity edges.
 - Rationale: command/scope parity is rules-semantic and should land first; YAML key checks are content-index validation and can be layered without changing architecture.
 
 #### Localisation parser requirements (agreed constraints, 2026-02-09)
@@ -571,7 +572,7 @@ This file contains a block `localisation_commands ` that contains a list of loca
 - Localisation values are single-line:
   - if opening quote on an entry line has no closing quote on the same line, emit unterminated-string diagnostic.
 - Keep dedicated diagnostics for indentation/column structure errors (`LOCALISATION_INVALID_COLUMN`) rather than collapsing into generic invalid-entry diagnostics.
-- Current-state caveat: `LocalisationIndex` presently stores full entry payloads; compact provider extraction is planned as follow-up.
+- Current-state caveat: `LocalisationIndex` still stores full entry payloads for rich/localisation-file workflows; rules/typecheck now use compact key-provider artifacts.
 - File ingestion is BOM-aware:
   - read UTF-8 bytes, strip BOM from parsed content, retain BOM-presence metadata for policy checks.
 - Keep boundaries explicit:

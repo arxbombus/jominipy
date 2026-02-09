@@ -140,6 +140,10 @@ def _bind_services_to_rules(
             replacements["localisation_command_definitions_by_name"] = (
                 services.localisation_command_definitions_by_name
             )
+        if hasattr(rule, "localisation_key_provider") and getattr(
+            rule, "localisation_key_provider"
+        ).is_empty:
+            replacements["localisation_key_provider"] = services.localisation_key_provider
         if hasattr(rule, "alias_memberships_by_family") and not getattr(rule, "alias_memberships_by_family"):
             replacements["alias_memberships_by_family"] = services.alias_memberships_by_family
         if hasattr(rule, "subtype_matchers_by_object") and not getattr(rule, "subtype_matchers_by_object"):
