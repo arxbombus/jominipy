@@ -162,6 +162,10 @@ Phase 1.1 progress:
   - strict `unresolved_reference` behavior for unknown dynamic alias keys/families (`defer` vs `error`),
   - subtype-gated alias/single-alias invocation enforcement per object occurrence.
 - Completed (initial): Phase 5 subtype gating/materialization (deterministic per-object subtype matcher gating + subtype-conditional field constraints).
+- Completed (expanded): subtype matcher option + scope integration parity pass:
+  - matcher options `type_key_filter` / `starts_with` extracted and enforced in subtype resolution,
+  - subtype resolution now follows first-match declaration order (single active subtype),
+  - subtype `push_scope` is applied into scope-context resolution for reference checks (`scope[...]`), scope-context validation, and localisation command scope checks.
 - Completed (initial): Phase 5 complex enum materialization (project-file scanning with `name` tree, `start_from_root`, and path filters).
 - Completed (initial): Phase 5 special-file provider pass 1 (`values` memberships + `links` definitions wired into scope-ref checks).
 - Completed (initial): Phase 5 special-file provider pass 2 (`modifiers`/`modifier_categories` + `localisation_commands` provider extraction wired into typecheck services; `links` `from_data` now enforces `data_source` membership in scope-ref resolution).
@@ -189,7 +193,7 @@ Phase 1.1 progress:
     8. current-state caveat: existing `LocalisationIndex` remains full-entry heavy for rich parse consumers; typecheck now also has a compact `LocalisationKeyProvider` path for key existence/coverage checks.
   - parked optimization note:
     - experimental lexer micro-optimization variant is preserved at `jominipy/lexer/faster_lexer.py` and intentionally not active runtime code at this stage.
-  - harden parity edge cases for alias/subtype/complex-enum semantics against CWTools behavior (`type_key_filter`, `starts_with`, subtype `push_scope`, complex enum edge-path semantics).
+  - harden remaining parity edge cases for complex-enum semantics and special-file semantics (`modifiers`/remaining `links` edges) against CWTools behavior.
   - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 
 Boundary constraints (must remain true):

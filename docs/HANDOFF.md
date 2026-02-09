@@ -202,10 +202,17 @@ Every agent must perform this checklist before finishing a substantive task:
 - Update (current): option-surface parity is now landed (`comparison`, `error_if_only_match`, reference labels), including `TYPECHECK_RULE_CUSTOM_ERROR` execution wiring.
 - Update (current): deeper `links` advanced-chain semantics are now landed (multi-segment + mixed prefixed segments with per-segment input/data-source gating).
 - Update (current): strict `push_scope`/`replace_scope` precedence compatibility is now landed (CWTools precedence: same-path `push_scope` wins; `replace_scope` skipped).
+- Update (current): alias/single-alias hardening pass is landed:
+  - strict unresolved handling for dynamic alias keys/families (`defer` vs `error`),
+  - subtype-gated alias/single-alias invocation application by object occurrence.
+- Update (current): subtype option + scope integration pass is landed:
+  - subtype matcher options `type_key_filter` and `starts_with` are extracted/enforced,
+  - subtype matcher evaluation now uses declaration-order first-match semantics,
+  - subtype `push_scope` is injected into scope-context resolution (`scope[...]`, scope-context checks, localisation command scope checks).
 - Localisation Stage 2 is now landed for rules/typecheck workflows:
   - compact `LocalisationKeyProvider` key existence/coverage checks,
   - required type-template localisation key materialization checks (`$` templates + `## required`).
-- Immediate next step: alias/single-alias hardening and edge-case parity (unresolved policy strictness + subtype-gated invocation behavior).
+- Immediate next step: complex enum parity hardening (edge path/structure semantics) and remaining special-file semantic hardening (`modifiers` scope/usage edges) under the rules-module checklist.
 - Update (2026-02-09 current): localisation parser is now implemented as a single full-file shared-lexer path and keeps all trivia/comments in a separate `LocalisationParseResult.trivia` channel.
   - Important boundary: entry-level value fields (`leading_trivia`/`trailing_trivia`) remain for value-local formatting semantics, while full-file comments/blank-line trivia are preserved separately for future formatter integration.
   - Column validation now uses dedicated diagnostic code `LOCALISATION_INVALID_COLUMN` (not generic `LOCALISATION_INVALID_ENTRY`).
@@ -237,6 +244,9 @@ Every agent must perform this checklist before finishing a substantive task:
 ## Latest Validation Snapshot (authoritative, 2026-02-09 current)
 - `uv run pytest -q tests/test_rules_ingest.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py tests/typecheck/test_services_and_facts.py` (`71 passed`)
 - `uv run ruff check jominipy/rules/adapter.py jominipy/rules/__init__.py jominipy/typecheck/services.py jominipy/typecheck/runner.py jominipy/typecheck/rules.py tests/test_rules_ingest.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py` (passed)
+- `uv run pytest -q tests/test_rules_ingest.py tests/typecheck/test_reference_rules.py tests/typecheck/test_scope_rules.py tests/typecheck/test_localisation_rules.py` (`80 passed`)
+- `uv run ruff check jominipy/rules/adapter.py jominipy/typecheck/rules.py tests/test_rules_ingest.py tests/typecheck/test_scope_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_reference_rules.py` (passed)
+- `uv run pyrefly check` (`0 errors`, `1 suppressed`)
 
 ## Validation Snapshot (historical)
 - `uv run pytest tests/test_lint_typecheck_engines.py tests/typecheck/test_field_constraint_rules.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py tests/typecheck/test_services_and_facts.py tests/test_localisation_parser.py tests/test_localisation_keys.py` (`73 passed`)

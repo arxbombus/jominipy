@@ -11,6 +11,7 @@ from jominipy.rules import (
     RuleValueSpec,
     SingleAliasDefinition,
     SingleAliasInvocation,
+    SubtypeMatcher,
     TypeLocalisationTemplate,
     build_alias_definitions_by_family,
     build_alias_invocations_by_object,
@@ -449,6 +450,45 @@ def test_subtype_matchers_are_extracted_from_type_definitions() -> None:
     assert matchers["ship_size"][1].expected_field_values == (("class", "shipclass_military"),)
 
 
+def test_subtype_matchers_extract_type_key_filter_and_starts_with_options() -> None:
+    source = """types = {
+    type[ship_size] = {
+        ## type_key_filter = { ship_size station_size }
+        ## starts_with = ship_
+        ## push_scope = country
+        subtype[starbase] = {
+            class = shipclass_starbase
+        }
+        ## type_key_filter = <> station_size
+        subtype[ship] = {
+            class = shipclass_military
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-subtype-options.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    matchers = build_subtype_matchers_by_object(schema)
+    assert matchers["ship_size"][0] == SubtypeMatcher(
+        subtype_name="starbase",
+        expected_field_values=(("class", "shipclass_starbase"),),
+        type_key_filters=("ship_size", "station_size"),
+        excluded_type_key_filters=(),
+        starts_with="ship_",
+        push_scope=("country",),
+    )
+    assert matchers["ship_size"][1] == SubtypeMatcher(
+        subtype_name="ship",
+        expected_field_values=(("class", "shipclass_military"),),
+        type_key_filters=(),
+        excluded_type_key_filters=("station_size",),
+        starts_with=None,
+    )
+
+
 def test_subtype_field_constraints_are_extracted_from_object_rules() -> None:
     source = """ship_size = {
     subtype[starbase] = {
@@ -526,6 +566,55 @@ def test_complex_enum_start_from_root_walks_top_level_children() -> None:
         definitions_by_key=definitions,
     )
     assert values["root_keys"] == frozenset({"alpha", "beta"})
+
+
+def test_complex_enum_matches_cwtools_stl_enums_fixture() -> None:
+    fixture_root = (
+        Path(__file__).resolve().parents[1]
+        / "references/cwtools/CWToolsTests/testfiles/configtests/rulestests/STL/enums"
+    )
+    rules_source = (fixture_root / "rules.cwt").read_text(encoding="utf-8")
+    parsed = parse_rules_text(rules_source, source_path="stl-enums-rules.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    file_texts_by_path = {
+        path.relative_to(fixture_root).as_posix(): path.read_text(encoding="utf-8")
+        for path in (fixture_root / "common").rglob("*.txt")
+    }
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path=file_texts_by_path,
+        definitions_by_key=definitions,
+    )
+    assert values["singlefile"] == frozenset({"one", "two"})
+    assert values["top_leaf"] == frozenset({"one", "two"})
+    assert values["complex_path"] == frozenset({"test1", "test2", "test3", "test4", "test5"})
+    assert values["specific_path"] == frozenset({"stest1", "stest2", "stest4"})
+
+
+def test_complex_enum_merges_values_from_multiple_same_key_definitions() -> None:
+    fixture_root = (
+        Path(__file__).resolve().parents[1]
+        / "references/cwtools/CWToolsTests/testfiles/configtests/rulestests/STL/misc"
+    )
+    rules_source = (fixture_root / "rules.cwt").read_text(encoding="utf-8")
+    parsed = parse_rules_text(rules_source, source_path="stl-misc-rules.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    file_texts_by_path = {
+        path.relative_to(fixture_root).as_posix(): path.read_text(encoding="utf-8")
+        for path in (fixture_root / "common").rglob("*.txt")
+    }
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path=file_texts_by_path,
+        definitions_by_key=definitions,
+    )
+    assert values["multiple"] == frozenset({"a", "b", "c", "d"})
 
 
 def test_values_memberships_are_extracted_from_values_section() -> None:

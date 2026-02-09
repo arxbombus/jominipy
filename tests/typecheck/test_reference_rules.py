@@ -461,6 +461,98 @@ def test_typecheck_field_reference_rule_applies_subtype_gating_per_object_occurr
     ]
 
 
+def test_typecheck_subtype_matcher_respects_type_key_filter_option() -> None:
+    source = """country_event = {
+    weight = yes
+}
+"""
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={"country_event": {}},
+        subtype_matchers_by_object={
+            "country_event": (
+                SubtypeMatcher(subtype_name="event", type_key_filters=("country_event",)),
+            )
+        },
+        subtype_field_constraints_by_object={
+            "country_event": {
+                "event": {
+                    "weight": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                    ),
+                }
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_TYPE"]
+
+
+def test_typecheck_subtype_matcher_respects_starts_with_option() -> None:
+    source = """b_title = {
+    value = yes
+}
+"""
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={"b_title": {}},
+        subtype_matchers_by_object={
+            "b_title": (
+                SubtypeMatcher(subtype_name="barony", starts_with="b_"),
+            )
+        },
+        subtype_field_constraints_by_object={
+            "b_title": {
+                "barony": {
+                    "value": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                    ),
+                }
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_TYPE"]
+
+
+def test_typecheck_subtype_matcher_uses_first_matching_subtype_in_declaration_order() -> None:
+    source = """ship_size = {
+    class = shipclass_starbase
+    max_wings = yes
+}
+"""
+    custom_rule = FieldConstraintRule(
+        field_constraints_by_object={"ship_size": {}},
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(subtype_name="first"),
+                SubtypeMatcher(subtype_name="second"),
+            )
+        },
+        subtype_field_constraints_by_object={
+            "ship_size": {
+                "first": {
+                    "max_wings": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                    ),
+                },
+                "second": {
+                    "max_wings": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="bool", primitive="bool", argument=None),),
+                    ),
+                },
+            }
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_TYPE"]
+
+
 def test_typecheck_runner_binds_service_enum_memberships_for_enum_refs() -> None:
     source = "technology={ stance = offensive }\n"
     custom_rule = FieldReferenceConstraintRule(

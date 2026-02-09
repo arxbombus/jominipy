@@ -286,6 +286,12 @@ class FieldReferenceConstraintRule:
                     scope_context = _resolve_scope_context_before_path(
                         relative_path=relative_path,
                         by_path=scope_constraints.get(object_key, {}),
+                        initial_push_scopes=_resolve_subtype_push_scopes(
+                            object_key=object_key,
+                            object_occurrence=field_fact.object_occurrence,
+                            matchers=subtype_matchers,
+                            facts=facts,
+                        ),
                     )
                     if scope_context.ambiguity is not None:
                         diagnostics.append(
@@ -349,6 +355,7 @@ class FieldScopeContextRule:
     domain: TypecheckDomain = "correctness"
     confidence: TypecheckConfidence = "sound"
     field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
 
     def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
         scope_constraints = self.field_scope_constraints_by_object
@@ -365,8 +372,17 @@ class FieldScopeContextRule:
             if declaration_constraint is None or declaration_constraint.required_scope is None:
                 continue
 
-            active_scopes = _resolve_active_scopes_before_path(relative_path=relative_path, by_path=by_object)
-            scope_context = _resolve_scope_context_before_path(relative_path=relative_path, by_path=by_object)
+            subtype_push_scopes = _resolve_subtype_push_scopes(
+                object_key=field_fact.object_key,
+                object_occurrence=field_fact.object_occurrence,
+                matchers=self.subtype_matchers_by_object.get(field_fact.object_key, ()),
+                facts=facts,
+            )
+            scope_context = _resolve_scope_context_before_path(
+                relative_path=relative_path,
+                by_path=by_object,
+                initial_push_scopes=subtype_push_scopes,
+            )
             if scope_context.ambiguity is not None:
                 diagnostics.append(
                     Diagnostic(
@@ -383,7 +399,7 @@ class FieldScopeContextRule:
                 )
                 continue
             required = set(scope.lower() for scope in declaration_constraint.required_scope)
-            if active_scopes and required.intersection(active_scopes):
+            if scope_context.active_scopes and required.intersection(scope_context.active_scopes):
                 continue
             diagnostics.append(
                 Diagnostic(
@@ -817,6 +833,12 @@ class LocalisationCommandScopeRule:
                     scope_context = _resolve_scope_context_before_path(
                         relative_path=relative_path,
                         by_path=scope_constraints.get(object_key, {}),
+                        initial_push_scopes=_resolve_subtype_push_scopes(
+                            object_key=object_key,
+                            object_occurrence=field_fact.object_occurrence,
+                            matchers=subtype_matchers,
+                            facts=facts,
+                        ),
                     )
                     for command in commands:
                         command_def = self.localisation_command_definitions_by_name.get(command)
@@ -970,6 +992,12 @@ class ErrorIfOnlyMatchRule:
                     scope_context = _resolve_scope_context_before_path(
                         relative_path=relative_path,
                         by_path=scope_constraints.get(object_key, {}),
+                        initial_push_scopes=_resolve_subtype_push_scopes(
+                            object_key=object_key,
+                            object_occurrence=field_fact.object_occurrence,
+                            matchers=subtype_matchers,
+                            facts=facts,
+                        ),
                     )
                     if scope_context.ambiguity is not None:
                         continue
@@ -1219,7 +1247,9 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             policy=resolved_services.policy,
         ),
-        FieldScopeContextRule(),
+        FieldScopeContextRule(
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+        ),
     ]
     return tuple(sorted(rules, key=lambda rule: (rule.code, rule.name)))
 
@@ -1306,8 +1336,44 @@ def _resolve_active_subtypes(
     matchers: tuple[SubtypeMatcher, ...],
     facts: AnalysisFacts,
 ) -> tuple[str, ...]:
-    if not matchers:
+    matcher = _resolve_active_subtype_matcher(
+        object_key=object_key,
+        object_occurrence=object_occurrence,
+        matchers=matchers,
+        facts=facts,
+    )
+    if matcher is None:
         return ()
+    return (matcher.subtype_name,)
+
+
+def _resolve_subtype_push_scopes(
+    *,
+    object_key: str,
+    object_occurrence: int,
+    matchers: tuple[SubtypeMatcher, ...],
+    facts: AnalysisFacts,
+) -> tuple[str, ...]:
+    matcher = _resolve_active_subtype_matcher(
+        object_key=object_key,
+        object_occurrence=object_occurrence,
+        matchers=matchers,
+        facts=facts,
+    )
+    if matcher is None:
+        return ()
+    return matcher.push_scope
+
+
+def _resolve_active_subtype_matcher(
+    *,
+    object_key: str,
+    object_occurrence: int,
+    matchers: tuple[SubtypeMatcher, ...],
+    facts: AnalysisFacts,
+) -> SubtypeMatcher | None:
+    if not matchers:
+        return None
     fields = facts.object_fields.get(object_key, ())
     by_field: dict[str, list[AstScalar]] = {}
     for field_fact in fields:
@@ -1316,18 +1382,24 @@ def _resolve_active_subtypes(
         if not isinstance(field_fact.value, AstScalar):
             continue
         by_field.setdefault(field_fact.field_key, []).append(field_fact.value)
-    active: list[str] = []
     for matcher in matchers:
-        if _matcher_applies(matcher, by_field=by_field):
-            active.append(matcher.subtype_name)
-    return tuple(active)
+        if _matcher_applies(matcher, object_key=object_key, by_field=by_field):
+            return matcher
+    return None
 
 
 def _matcher_applies(
     matcher: SubtypeMatcher,
     *,
+    object_key: str,
     by_field: Mapping[str, list[AstScalar]],
 ) -> bool:
+    if matcher.type_key_filters and object_key not in matcher.type_key_filters:
+        return False
+    if matcher.excluded_type_key_filters and object_key in matcher.excluded_type_key_filters:
+        return False
+    if matcher.starts_with and not object_key.startswith(matcher.starts_with):
+        return False
     for field_name, expected_value in matcher.expected_field_values:
         candidates = by_field.get(field_name, [])
         if not candidates:
@@ -2007,8 +2079,13 @@ def _resolve_active_scopes_before_path(
     *,
     relative_path: tuple[str, ...],
     by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
+    initial_push_scopes: tuple[str, ...] = (),
 ) -> set[str]:
-    context = _resolve_scope_context_before_path(relative_path=relative_path, by_path=by_path)
+    context = _resolve_scope_context_before_path(
+        relative_path=relative_path,
+        by_path=by_path,
+        initial_push_scopes=initial_push_scopes,
+    )
     return set(context.active_scopes)
 
 
@@ -2016,9 +2093,12 @@ def _resolve_scope_context_before_path(
     *,
     relative_path: tuple[str, ...],
     by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
+    initial_push_scopes: tuple[str, ...] = (),
 ) -> ScopeContext:
     aliases: dict[str, str] = {}
     ambiguity: str | None = None
+    for scope in initial_push_scopes:
+        _apply_push_scope(aliases, scope.lower())
     path_prefixes: list[tuple[str, ...]] = [()]
     for i in range(1, len(relative_path)):
         path_prefixes.append(relative_path[:i])

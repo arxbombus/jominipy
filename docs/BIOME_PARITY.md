@@ -74,6 +74,13 @@ For every parser/CST/AST feature, record:
     - type-localisation templates (`$` forms + `## required`) are extracted from rules adapters,
     - typecheck validates required materialized keys against compact localisation key-provider artifacts.
   - update (2026-02-08): subtype adapter wiring landed (deterministic matcher gating + subtype-conditional field constraints in typecheck).
+  - update (2026-02-09): alias/single-alias hardening landed:
+    - strict unresolved policy behavior for unknown dynamic alias keys/families (`defer` vs `error`),
+    - subtype-gated alias/single-alias invocation application per object occurrence.
+  - update (2026-02-09): subtype option + scope integration landed:
+    - subtype matcher options `type_key_filter` and `starts_with` extracted from rules metadata and enforced in matcher evaluation,
+    - subtype evaluation now follows declaration-order first-match semantics (single active subtype),
+    - subtype `push_scope` now feeds scope-context resolution in reference, scope-context, and localisation-command scope rules.
   - update (2026-02-08): complex enum materialization landed (project-file scan + name-tree traversal + `start_from_root`/path filtering) and is injected into enum reference checks through services.
   - update (2026-02-08): special-file provider pass 1 landed:
     - `values` section memberships merged into `value[...]` reference memberships,

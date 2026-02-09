@@ -2,6 +2,7 @@ from jominipy.pipeline import run_typecheck
 from jominipy.rules import (
     RuleFieldConstraint,
     RuleValueSpec,
+    SubtypeMatcher,
 )
 from jominipy.rules.ir import RuleScopeReplacement
 from jominipy.rules.semantics import RuleFieldScopeConstraint
@@ -43,6 +44,33 @@ def test_typecheck_scope_context_rule_reports_missing_scope_transition() -> None
     assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_SCOPE_CONTEXT"]
 
 
+def test_typecheck_scope_context_rule_applies_subtype_push_scope() -> None:
+    source = """ship_size = {
+    class = shipclass_starbase
+    target = TAG
+}
+"""
+    custom_rule = FieldScopeContextRule(
+        field_scope_constraints_by_object={
+            "ship_size": {
+                ("target",): RuleFieldScopeConstraint(required_scope=("country",)),
+            }
+        },
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(
+                    subtype_name="starbase",
+                    expected_field_values=(("class", "shipclass_starbase"),),
+                    push_scope=("country",),
+                ),
+            )
+        },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
 def test_typecheck_scope_ref_resolves_this_alias_from_push_scope_context() -> None:
     source = "technology={ who = this }\n"
     custom_rule = FieldReferenceConstraintRule(
@@ -60,6 +88,38 @@ def test_typecheck_scope_ref_resolves_this_alias_from_push_scope_context() -> No
                 (): RuleFieldScopeConstraint(push_scope=("country",)),
             }
         },
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_scope_ref_resolves_this_alias_from_subtype_push_scope_context() -> None:
+    source = """ship_size = {
+    class = shipclass_starbase
+    who = this
+}
+"""
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object={
+            "ship_size": {
+                "who": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(RuleValueSpec(kind="scope_ref", raw="scope[country]", argument="country"),),
+                ),
+            }
+        },
+        known_scopes=frozenset({"country"}),
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(
+                    subtype_name="starbase",
+                    expected_field_values=(("class", "shipclass_starbase"),),
+                    push_scope=("country",),
+                ),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
     )
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))

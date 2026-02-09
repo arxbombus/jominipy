@@ -9,6 +9,7 @@ from jominipy.rules import (
     LocalisationCommandDefinition,
     RuleFieldConstraint,
     RuleValueSpec,
+    SubtypeMatcher,
     TypeLocalisationTemplate,
 )
 from jominipy.rules.semantics import RuleFieldScopeConstraint
@@ -71,6 +72,42 @@ def test_typecheck_localisation_command_scope_rejects_mismatched_scope() -> None
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))
     assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+
+
+def test_typecheck_localisation_command_scope_applies_subtype_push_scope() -> None:
+    source = """ship_size = {
+    class = shipclass_starbase
+    desc = "[ROOT.GetWing]"
+}
+"""
+    custom_rule = LocalisationCommandScopeRule(
+        field_constraints_by_object={
+            "ship_size": {
+                "desc": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(kind="primitive", raw="localisation", primitive="localisation", argument=None),
+                    ),
+                ),
+            }
+        },
+        localisation_command_definitions_by_name={
+            "GetWing": LocalisationCommandDefinition(name="GetWing", supported_scopes=("air",))
+        },
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(
+                    subtype_name="starbase",
+                    expected_field_values=(("class", "shipclass_starbase"),),
+                    push_scope=("air",),
+                ),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
 
 
 def test_typecheck_localisation_command_scope_unresolved_command_defer_policy() -> None:

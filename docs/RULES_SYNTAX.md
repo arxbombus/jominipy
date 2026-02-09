@@ -57,6 +57,9 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - strict `unresolved_reference` handling for unknown dynamic alias keys/families (`defer` vs `error`),
   - subtype-gated alias/single-alias invocation application per object occurrence.
 - [ ] Full subtype semantics (`type_key_filter`, `starts_with`, subtype `push_scope`, ordering/precedence edge cases) beyond current field-value matcher gating.
+  - [x] subtype matcher option extraction/enforcement for `type_key_filter` and `starts_with`.
+  - [x] subtype resolution ordering aligned to declaration-order first-match behavior.
+  - [x] subtype `push_scope` integration into scope-context resolution paths (`scope[...]`, scope-context checks, localisation command scope checks).
 - [ ] Full complex enum semantics parity (additional path/structure edge cases and parity verification against CWTools behavior).
 - [ ] Full special-file semantics parity (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
 - [ ] Full schema graph wiring into resolved correctness checks (enum/type/scope/value validation in typecheck).
