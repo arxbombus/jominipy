@@ -535,7 +535,7 @@ def test_complex_enum_values_materialize_from_project_files() -> None:
     definitions = build_complex_enum_definitions(schema)
     values = build_complex_enum_values_from_file_texts(
         file_texts_by_path={
-            "common/event_chains/sample.txt": "my_chain={ counter={ chain_counter = 1 } }\n",
+            "common/event_chains/sample.txt": "my_chain={ counter={ chain_counter = { } } }\n",
         },
         definitions_by_key=definitions,
     )
@@ -615,6 +615,112 @@ def test_complex_enum_merges_values_from_multiple_same_key_definitions() -> None
         definitions_by_key=definitions,
     )
     assert values["multiple"] == frozenset({"a", "b", "c", "d"})
+
+
+def test_complex_enum_path_filters_are_case_insensitive() -> None:
+    rules_source = """enums = {
+    complex_enum[case_sensitive] = {
+        path = "game/common/targets"
+        path_file = "TARGETS.TXT"
+        path_extension = .TXT
+        start_from_root = yes
+        name = {
+            enum_name = scalar
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(rules_source, source_path="inline-complex-enum-case-insensitive.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path={
+            "COMMON/TARGETS/targets.txt": "alpha = 1\n",
+            "common/targets/other.txt": "beta = 1\n",
+        },
+        definitions_by_key=definitions,
+    )
+    assert values["case_sensitive"] == frozenset({"alpha"})
+
+
+def test_complex_enum_without_paths_does_not_match_any_files() -> None:
+    rules_source = """enums = {
+    complex_enum[no_paths] = {
+        start_from_root = yes
+        name = {
+            enum_name = scalar
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(rules_source, source_path="inline-complex-enum-no-path.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path={
+            "common/targets/test.txt": "alpha = 1\n",
+        },
+        definitions_by_key=definitions,
+    )
+    assert values == {}
+
+
+def test_complex_enum_enum_name_block_collects_only_node_keys() -> None:
+    rules_source = """enums = {
+    complex_enum[node_only] = {
+        path = "game/common/targets"
+        start_from_root = yes
+        name = {
+            enum_name = { }
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(rules_source, source_path="inline-complex-enum-node-only.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path={
+            "common/targets/test.txt": "leaf = 1\nnode = { }\n",
+        },
+        definitions_by_key=definitions,
+    )
+    assert values["node_only"] == frozenset({"node"})
+
+
+def test_complex_enum_enum_name_scalar_collects_only_leaf_keys() -> None:
+    rules_source = """enums = {
+    complex_enum[leaf_only] = {
+        path = "game/common/targets"
+        start_from_root = yes
+        name = {
+            enum_name = scalar
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(rules_source, source_path="inline-complex-enum-leaf-only.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_complex_enum_definitions(schema)
+    values = build_complex_enum_values_from_file_texts(
+        file_texts_by_path={
+            "common/targets/test.txt": "leaf = 1\nnode = { }\n",
+        },
+        definitions_by_key=definitions,
+    )
+    assert values["leaf_only"] == frozenset({"leaf"})
 
 
 def test_values_memberships_are_extracted_from_values_section() -> None:

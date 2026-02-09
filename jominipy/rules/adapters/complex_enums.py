@@ -74,28 +74,36 @@ def load_hoi4_complex_enum_definitions() -> dict[str, tuple[ComplexEnumDefinitio
 
 
 def _matches_complex_enum_path(*, file_path: str, definition: ComplexEnumDefinition) -> bool:
-    if definition.path_file is not None and _basename(file_path) != _basename(definition.path_file):
-        return False
-    if definition.path_extension is not None and not file_path.endswith(definition.path_extension):
-        return False
-    if not definition.paths:
-        return True
     normalized_file = _normalize_path(file_path)
     file_dir = _dirname(normalized_file)
+    file_name = _basename(normalized_file)
+    exists = False
     for raw_declared in definition.paths:
         declared = _normalize_path(raw_declared)
         if declared.startswith("game/"):
             declared = declared[len("game/") :]
         declared = declared.rstrip("/")
-        if not declared:
-            return True
         if definition.path_strict:
-            if file_dir == declared:
-                return True
+            if _equals_ci(file_dir, declared):
+                exists = True
+                break
             continue
-        if normalized_file == declared or normalized_file.startswith(f"{declared}/"):
-            return True
-    return False
+        if _startswith_ci(file_dir, declared):
+            exists = True
+            break
+
+    if not exists:
+        return False
+
+    if definition.path_file is not None and not _equals_ci(file_name, definition.path_file):
+        return False
+
+    if definition.path_extension is not None:
+        file_extension = _extension(file_name)
+        if not _equals_ci(file_extension, definition.path_extension):
+            return False
+
+    return True
 
 
 def _extract_complex_enum_values_from_text(*, text: str, definition: ComplexEnumDefinition) -> set[str]:
@@ -124,7 +132,8 @@ def _extract_complex_enum_values_in_clause(
     name_tree: tuple[RuleStatement, ...],
 ) -> set[str]:
     values: set[str] = set()
-    key_values = _ast_clause_key_values(statements)
+    node_key_values = _ast_clause_node_key_values(statements)
+    leaf_key_values = _ast_clause_leaf_key_values(statements)
 
     for enumtree_node in name_tree:
         if enumtree_node.kind != "key_value" or enumtree_node.key is None:
@@ -134,21 +143,19 @@ def _extract_complex_enum_values_in_clause(
         lowered = enumtree_node.key.strip().lower()
         wildcard = lowered in {"scalar", "enum_name", "name"}
         if lowered == "enum_name":
-            for candidate in key_values:
+            for candidate, _ in node_key_values:
                 raw = candidate.key.raw_text.strip()
                 if raw:
                     values.add(raw)
         candidate_nodes = (
-            key_values
+            node_key_values
             if wildcard
-            else [candidate for candidate in key_values if candidate.key.raw_text.lower() == lowered]
+            else [(candidate, block) for candidate, block in node_key_values if candidate.key.raw_text.lower() == lowered]
         )
-        for candidate in candidate_nodes:
-            if not isinstance(candidate.value, AstBlock):
-                continue
+        for _, candidate_block in candidate_nodes:
             values.update(
                 _extract_complex_enum_values_in_clause(
-                    statements=candidate.value.statements,
+                    statements=candidate_block.statements,
                     name_tree=enumtree_node.value.block,
                 )
             )
@@ -163,33 +170,28 @@ def _extract_complex_enum_values_in_clause(
     if leaf_terminal is not None:
         leaf_key = leaf_terminal.lower()
         if leaf_key == "scalar":
-            for candidate in key_values:
-                if isinstance(candidate.value, AstScalar):
-                    raw = _normalize_scalar_text(candidate.value.raw_text)
-                    if raw:
-                        values.add(raw)
+            for _, candidate_scalar in leaf_key_values:
+                raw = _normalize_scalar_text(candidate_scalar.raw_text)
+                if raw:
+                    values.add(raw)
         else:
-            for candidate in key_values:
+            for candidate, candidate_scalar in leaf_key_values:
                 if candidate.key.raw_text.lower() != leaf_key:
                     continue
-                if not isinstance(candidate.value, AstScalar):
-                    continue
-                raw = _normalize_scalar_text(candidate.value.raw_text)
+                raw = _normalize_scalar_text(candidate_scalar.raw_text)
                 if raw:
                     values.add(raw)
     else:
         enum_name_leaf = _first_leaf_with_enum_name_key(name_tree)
         if enum_name_leaf is not None:
             if enum_name_leaf.lower() == "scalar":
-                for candidate in key_values:
+                for candidate, _ in leaf_key_values:
                     raw = candidate.key.raw_text.strip()
                     if raw:
                         values.add(raw)
             else:
-                for candidate in key_values:
-                    if not isinstance(candidate.value, AstScalar):
-                        continue
-                    if _normalize_scalar_text(candidate.value.raw_text) != enum_name_leaf:
+                for candidate, candidate_scalar in leaf_key_values:
+                    if _normalize_scalar_text(candidate_scalar.raw_text) != enum_name_leaf:
                         continue
                     raw = candidate.key.raw_text.strip()
                     if raw:
@@ -199,6 +201,22 @@ def _extract_complex_enum_values_in_clause(
 
 def _ast_clause_key_values(statements: tuple[AstStatement, ...]) -> list[AstKeyValue]:
     return [statement for statement in statements if isinstance(statement, AstKeyValue)]
+
+
+def _ast_clause_node_key_values(statements: tuple[AstStatement, ...]) -> list[tuple[AstKeyValue, AstBlock]]:
+    pairs: list[tuple[AstKeyValue, AstBlock]] = []
+    for statement in _ast_clause_key_values(statements):
+        if isinstance(statement.value, AstBlock):
+            pairs.append((statement, statement.value))
+    return pairs
+
+
+def _ast_clause_leaf_key_values(statements: tuple[AstStatement, ...]) -> list[tuple[AstKeyValue, AstScalar]]:
+    pairs: list[tuple[AstKeyValue, AstScalar]] = []
+    for statement in _ast_clause_key_values(statements):
+        if isinstance(statement.value, AstScalar):
+            pairs.append((statement, statement.value))
+    return pairs
 
 
 def _ast_clause_scalars(statements: tuple[AstStatement, ...]) -> list[AstScalar]:
@@ -255,3 +273,17 @@ def _normalize_path(path: str) -> str:
 
 def _normalize_scalar_text(raw: str) -> str:
     return raw.strip().strip('"')
+
+
+def _extension(file_name: str) -> str:
+    if "." not in file_name:
+        return ""
+    return f".{file_name.rsplit('.', 1)[1]}"
+
+
+def _equals_ci(left: str, right: str) -> bool:
+    return left.lower() == right.lower()
+
+
+def _startswith_ci(left: str, prefix: str) -> bool:
+    return left.lower().startswith(prefix.lower())

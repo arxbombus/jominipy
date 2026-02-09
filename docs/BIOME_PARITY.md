@@ -87,6 +87,10 @@ For every parser/CST/AST feature, record:
     - added quoted declaration parity for `"enum[key]"` with quoted-value enforcement in reference matching,
     - added filter-edge test coverage for `path_strict` + `path_extension`,
     - added default typecheck rule-stack execution coverage for enum-reference service wiring.
+  - update (2026-02-09 current, path/structure hardening):
+    - aligned complex-enum path filtering with CWTools `CheckPathDir` semantics (case-insensitive `path`/`path_file`/`path_extension`; no-match when no `path` entries are configured),
+    - aligned `enum_name` extraction shape semantics so `enum_name = {}` collects node keys only and `enum_name = scalar` collects leaf keys only,
+    - parity locked with focused ingest + E2E tests.
   - update (2026-02-08): special-file provider pass 1 landed:
     - `values` section memberships merged into `value[...]` reference memberships,
     - `links` definitions injected into typecheck scope-reference validation for link-prefix/output-scope transitions with input-scope gating.

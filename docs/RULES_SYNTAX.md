@@ -42,6 +42,10 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] End-to-end typecheck coverage for `enum[...]` against CWTools fixture-derived complex enums (valid + invalid cases).
   - [x] Quoted `enum[...]` declaration semantics are enforced in typecheck (`"enum[key]"` requires quoted values and validates membership).
   - [x] Complex-enum path filter edge coverage (`path_strict` + `path_extension`) via end-to-end typecheck tests.
+  - [x] Complex-enum path matching parity for case-insensitive `path`/`path_file`/`path_extension` handling.
+  - [x] Complex-enum `enum_name` structure parity:
+    - `enum_name = {}` collects node keys only.
+    - `enum_name = scalar` collects leaf keys only.
 
 ### Temporary compatibility note
 - Current `project_root` auto-binding for custom-injected typecheck rules (especially custom `value_set/value` constraints) exists primarily to keep test coverage and local experimentation stable.
@@ -239,7 +243,10 @@ If you need to generate an enum dynamically from mod files, you can use a `compl
 	}
 ```
 `path` is the folder in which files are processed for this enum.
+Path/path-file/path-extension matching follows CWTools behavior (case-insensitive matching).
+Complex enums require at least one `path` entry to match files (no implicit global match).
 `name` contains a structure that will be mapped onto each top level entity in the files given. The structure will be followed until a key is found in the place of `enum_name`. This key will then be added to the enum. `scalar` will match anything, otherwise the key needs to match.
+`enum_name = {}` collects node keys, while `enum_name = scalar` collects leaf keys.
 `start_from_root` makes the complex enum start from the top of the file instead of from the first level.
 <a name="values"/>
 

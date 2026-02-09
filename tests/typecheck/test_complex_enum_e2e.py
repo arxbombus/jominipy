@@ -210,6 +210,47 @@ event = {
     assert [diagnostic.code for diagnostic in invalid_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
 
 
+def test_typecheck_complex_enum_path_filters_are_case_insensitive() -> None:
+    rules_source = """enums = {
+    complex_enum[case_enum] = {
+        path = "game/common/targets"
+        path_file = "TARGETS.TXT"
+        path_extension = .TXT
+        start_from_root = yes
+        name = {
+            enum_name = scalar
+        }
+    }
+}
+event = {
+    field = enum[case_enum]
+}
+"""
+    field_constraints, enum_memberships = _build_constraints_and_enum_memberships(
+        rules_source=rules_source,
+        source_path="inline-case-insensitive.cwt",
+        file_texts_by_path={
+            "COMMON/TARGETS/targets.txt": "alpha = yes\n",
+            "common/targets/other.txt": "beta = yes\n",
+        },
+    )
+
+    custom_rule = FieldReferenceConstraintRule(
+        field_constraints_by_object=field_constraints,
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+    services = TypecheckServices(
+        enum_memberships_by_key=enum_memberships,
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    valid_result = run_typecheck("event={ field = alpha }\n", rules=(custom_rule,), services=services)
+    invalid_result = run_typecheck("event={ field = beta }\n", rules=(custom_rule,), services=services)
+
+    assert valid_result.diagnostics == []
+    assert [diagnostic.code for diagnostic in invalid_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+
+
 def test_typecheck_complex_enum_reference_with_default_rule_stack() -> None:
     field_constraints, enum_memberships = _load_stl_enum_fixture()
     services = TypecheckServices(
