@@ -41,6 +41,14 @@ Every agent must perform this checklist before finishing a substantive task:
   3. complex enum derivation pipeline
   4. special-file semantic providers (`links`, `modifiers`, `values`, `localisation`) and checker wiring
   5. localisation Stage 2: YAML localisation key existence/coverage indexing + checker wiring
+- Test-suite structure update (2026-02-09):
+  - `tests/test_lint_typecheck_engines.py` is now smoke/contract coverage only.
+  - Typecheck parity coverage was split into focused modules:
+    - `tests/typecheck/test_field_constraint_rules.py`
+    - `tests/typecheck/test_reference_rules.py`
+    - `tests/typecheck/test_localisation_rules.py`
+    - `tests/typecheck/test_scope_rules.py`
+    - `tests/typecheck/test_services_and_facts.py`
 - Core invariants remain required:
   - one parse/facts lifecycle (`JominiParseResult`)
   - lint/typecheck boundary contracts
@@ -219,6 +227,9 @@ Every agent must perform this checklist before finishing a substantive task:
     - unescaped inner quotes split into multiple tokens and produce `LEXER_UNTERMINATED_STRING`. (we previous had an option `allow_multiline_strings` in our lexer that remains unused, we should change it to `allow_unterminated_strings` and use that in `_lex_string()` to allow unterminated. We have to be careful with this as loc strings still must begin and end with quotes, either double or single, just like in proper yaml -> all locs are strings and must begin and end with quotes. I don't even know if our lexer can handle single quotes. We definitely need to be careful with this)
     - therefore localisation grammar must not depend on strict `STRING` token correctness for value payload capture.
   - Recommended adaptation (next agent implementation plan):
+
+## Latest Validation Snapshot (2026-02-09, tests split)
+- `uv run pytest tests/test_lint_typecheck_engines.py tests/typecheck/test_field_constraint_rules.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py tests/typecheck/test_services_and_facts.py tests/test_localisation_parser.py tests/test_localisation_keys.py` (`73 passed`)
     1. Add localisation parser mode/entrypoint and grammar (`parse_localisation_*`) while keeping existing Jomini parse path untouched.
     2. Parse header (`l_<locale>:`) and entry prefix (`key:version`) with normal tokens.
     3. Capture value payload from original source slice to end-of-line (range-based), not by trusting strict `STRING` tokenization.

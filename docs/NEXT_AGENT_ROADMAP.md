@@ -109,7 +109,14 @@ Status:
   - separate type-check runner scaffold (`jominipy/typecheck/runner.py`)
   - deterministic lint rule registry scaffold with semantic/style split (`jominipy/lint/rules.py`)
   - entrypoint orchestration update: `run_typecheck(...)` and `run_check(...)` compose typecheck + lint over one parse
-  - validation coverage: `tests/test_lint_typecheck_engines.py`
+  - validation coverage:
+    - smoke/contracts: `tests/test_lint_typecheck_engines.py`
+    - focused typecheck parity suites:
+      - `tests/typecheck/test_field_constraint_rules.py`
+      - `tests/typecheck/test_reference_rules.py`
+      - `tests/typecheck/test_localisation_rules.py`
+      - `tests/typecheck/test_scope_rules.py`
+      - `tests/typecheck/test_services_and_facts.py`
 - Next (reprioritized from full-surface parity audit):
   - follow the checklist in `docs/RULES_SYNTAX.md` as execution order.
   - implement advanced semantic execution gaps first:
