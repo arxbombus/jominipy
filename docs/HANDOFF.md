@@ -192,6 +192,13 @@ Every agent must perform this checklist before finishing a substantive task:
 - Update (current): deeper `links` advanced-chain semantics are now landed (multi-segment + mixed prefixed segments with per-segment input/data-source gating).
 - Update (current): strict `push_scope`/`replace_scope` precedence compatibility is now landed (CWTools precedence: same-path `push_scope` wins; `replace_scope` skipped).
 - Immediate next step: localisation Stage 2 (YAML key existence/coverage indexing and semantic validation wiring).
+- Update (2026-02-09 current): localisation parser is now implemented as a single full-file shared-lexer path and keeps all trivia/comments in a separate `LocalisationParseResult.trivia` channel.
+  - Important boundary: entry-level value fields (`leading_trivia`/`trailing_trivia`) remain for value-local formatting semantics, while full-file comments/blank-line trivia are preserved separately for future formatter integration.
+  - Column validation now uses dedicated diagnostic code `LOCALISATION_INVALID_COLUMN` (not generic `LOCALISATION_INVALID_ENTRY`).
+  - Indexing status note: current `LocalisationIndex` still stores full `LocalisationEntry` objects (including value/trivia payload fields); a compact `LocalisationKeyProvider` abstraction is planned but not implemented yet.
+  - Planned design for rules/typecheck scale: default to key-only provider semantics for non-localisation-file workflows, and load full parse artifacts only on demand (formatter/open-loc-file paths).
+  - Performance experiments were intentionally paused for now to stay on roadmap scope: optimized lexer variant was reverted from active runtime and parked at `jominipy/lexer/faster_lexer.py` for later whole-library optimization phase.
+  - Priority reset: continue rules module parity work first; localisation formatter/trivia-resolution policy is deferred until formatter phase.
 - Localisation implementation reset decision (2026-02-09):
   - use a single architecture path only: extend shared lexer with explicit options/mode for localisation, and consume that in localisation parsing.
   - do not maintain dual parsing strategies (standalone line parser + lexer mode in parallel).

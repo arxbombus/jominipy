@@ -98,6 +98,10 @@ For every parser/CST/AST feature, record:
     - preserve both leading and trailing value trivia for formatter parity,
     - keep localisation values single-line and emit unterminated diagnostics for unclosed same-line quotes,
     - keep BOM-aware file ingestion metadata without introducing a second parser stack.
+  - update (2026-02-09 current):
+    - localisation parse results now preserve full-file trivia/comments in a separate trivia channel for formatter-phase round-trip safety,
+    - invalid child-column structure uses dedicated `LOCALISATION_INVALID_COLUMN` diagnostics,
+    - lexer micro-optimization experiment is intentionally parked (`jominipy/lexer/faster_lexer.py`) and not active runtime behavior during current rules-parity phase.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

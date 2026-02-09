@@ -39,6 +39,7 @@ This document defines the architecture we are implementing in jominipy.
 - Localisation parsing must remain a thin adapter over shared lexer/token infrastructure.
 - If localisation-specific lexer behavior is needed, implement it through lexer mode/options, not a second parser stack.
 - Localisation entries must preserve both leading and trailing trivia around values to support robust formatting and alignment.
+- Localisation parsing must also preserve full-file trivia/comments in a dedicated parse-result trivia channel for formatter-phase round-trip safety.
 - Localisation values are treated as single-line payloads; unclosed same-line quotes must emit unterminated diagnostics.
 - File ingestion must be UTF-8 BOM-aware (strip BOM for parsing while retaining BOM-presence metadata).
 

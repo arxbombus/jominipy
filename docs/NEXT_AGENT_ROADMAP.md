@@ -157,15 +157,22 @@ Phase 1.1 progress:
 - Completed: Phase 6 option-surface parity (`comparison`, `error_if_only_match`, reference labels) with deterministic typecheck execution for `error_if_only_match`.
 - Completed: strict compatibility precedence for same-path `push_scope` + `replace_scope` (CWTools precedence: `push_scope` wins; same-path `replace_scope` skipped).
 - Next:
+  - execution priority reset (current): continue rules-module parity checklist first; do not spend additional cycles on localisation micro-optimizations until dedicated optimization phase.
   - localisation sequencing requirement:
     1. command/scope semantics from `localisation.cwt` providers first (landed)
     2. localisation YAML key existence/coverage indexing second (next execution slice)
+    3. introduce `LocalisationKeyProvider` abstraction (planned, not landed) so rules/typecheck can consume compact key-level data instead of full localisation entry payloads.
   - localisation parser implementation constraints (2026-02-09 decision):
     1. use shared lexer with explicit localisation mode/options and consume it from localisation module.
     2. avoid dual-path parsing strategies; if lexer mode is adopted, localisation adapter must use that path exclusively.
     3. preserve both leading/trailing trivia around localisation values for formatter-safe round-trip behavior.
     4. treat localisation values as single-line only; unclosed same-line quotes must emit unterminated diagnostics.
     5. parse files from UTF-8 bytes with BOM-awareness (strip for parsing, retain BOM presence metadata).
+    6. preserve full-file trivia/comments in a separate localisation trivia channel for future formatter work; defer trivia-resolution/emission policy until formatter phase.
+    7. keep dedicated invalid-column diagnostics (`LOCALISATION_INVALID_COLUMN`) distinct from generic invalid-entry diagnostics.
+    8. current-state caveat: existing `LocalisationIndex` remains full-entry heavy; provider compaction is a later step in Stage 2 execution.
+  - parked optimization note:
+    - experimental lexer micro-optimization variant is preserved at `jominipy/lexer/faster_lexer.py` and intentionally not active runtime code at this stage.
   - harden parity edge cases for alias/subtype/complex-enum semantics against CWTools behavior (`type_key_filter`, `starts_with`, subtype `push_scope`, complex enum edge-path semantics).
   - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 
