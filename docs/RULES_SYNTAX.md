@@ -560,3 +560,17 @@ This file contains a block `localisation_commands ` that contains a list of loca
 - Stage 1: implement command/scope compatibility from `localisation.cwt` (`localisation_commands`, optional localisation-link metadata) as semantic adapter artifacts consumed by typecheck.
 - Stage 2: add localisation YAML ingestion for key existence/coverage checks (for required localisation keys and reference validation).
 - Rationale: command/scope parity is rules-semantic and should land first; YAML key checks are content-index validation and can be layered without changing architecture.
+
+#### Localisation parser requirements (agreed constraints, 2026-02-09)
+- Use one implementation path only:
+  - extend shared lexer with localisation mode/options and consume that in localisation parsing.
+  - do not maintain dual parsing strategies in parallel.
+- Preserve both `leading_trivia` and `trailing_trivia` around localisation values for formatter-safe lossless output.
+- Localisation values are single-line:
+  - if opening quote on an entry line has no closing quote on the same line, emit unterminated-string diagnostic.
+- File ingestion is BOM-aware:
+  - read UTF-8 bytes, strip BOM from parsed content, retain BOM-presence metadata for policy checks.
+- Keep boundaries explicit:
+  - shared lexer/token infra provides lexical behavior,
+  - localisation module is a thin grammar/adapter layer,
+  - no second independent parser stack.

@@ -23,6 +23,54 @@ LEXER_UNTERMINATED_STRING: Final[DiagnosticSpec] = DiagnosticSpec(
     category="lexer",
 )
 
+LOCALISATION_MISSING_HEADER: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LOCALISATION_MISSING_HEADER",
+    message="Missing localisation header (`l_<locale>:`).",
+    hint="Add a header line like `l_english:` at the top of the file.",
+    severity="error",
+    category="localisation",
+)
+
+LOCALISATION_INVALID_ENTRY: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LOCALISATION_INVALID_ENTRY",
+    message="Invalid localisation entry. Expected `<key>:<version> <value>`.",
+    hint='Use entries like `my_key:0 "My value"`.',
+    severity="error",
+    category="localisation",
+)
+
+LOCALISATION_INVALID_COLUMN: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LOCALISATION_INVALID_COLUMN",
+    message="Localisation key must align to the same starting column as sibling keys.",
+    hint="Keep all entry keys aligned to a single indentation column under the header.",
+    severity="error",
+    category="localisation",
+)
+
+LOCALISATION_INVALID_VALUE_QUOTES: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LOCALISATION_INVALID_VALUE_QUOTES",
+    message="Localisation value must start and end with the same quote.",
+    hint="Wrap values with matching quotes (`\"...\"` or `'...'`).",
+    severity="error",
+    category="localisation",
+)
+
+LOCALISATION_UNSUPPORTED_HEADER_LANGUAGE: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LOCALISATION_UNSUPPORTED_HEADER_LANGUAGE",
+    message="Unsupported localisation header language for the active profile.",
+    hint="Use one of the supported `l_<language>` header values for this game.",
+    severity="error",
+    category="localisation",
+)
+
+LOCALISATION_DUPLICATE_KEY: Final[DiagnosticSpec] = DiagnosticSpec(
+    code="LOCALISATION_DUPLICATE_KEY",
+    message="Duplicate localisation key in file.",
+    hint="Keep only one definition per key in the same file.",
+    severity="warning",
+    category="localisation",
+)
+
 PARSER_EXPECTED_VALUE: Final[DiagnosticSpec] = DiagnosticSpec(
     code="PARSER_EXPECTED_VALUE",
     message="Expected a value",

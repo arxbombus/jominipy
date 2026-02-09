@@ -24,7 +24,9 @@ class LexerCheckpoint:
 class Lexer:
     """Lossless lexer that emits trivia and non-trivia tokens."""
 
-    def __init__(self, source: str, *, allow_multiline_strings: bool = True) -> None:
+    def __init__(
+        self, source: str, *, allow_multiline_strings: bool = True
+    ) -> None:
         self._source = source
         self._position = 0
         self._after_newline = False
@@ -275,7 +277,8 @@ class Lexer:
                 if not self.is_eof:
                     self._advance(1)
                 continue
-            # Jomini strings are multiline: newline does not terminate a string.
+            if not self._allow_multiline_strings and (ch == "\n" or ch == "\r"):
+                break
             self._advance(1)
 
         if escaped:

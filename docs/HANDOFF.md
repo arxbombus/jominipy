@@ -192,6 +192,16 @@ Every agent must perform this checklist before finishing a substantive task:
 - Update (current): deeper `links` advanced-chain semantics are now landed (multi-segment + mixed prefixed segments with per-segment input/data-source gating).
 - Update (current): strict `push_scope`/`replace_scope` precedence compatibility is now landed (CWTools precedence: same-path `push_scope` wins; `replace_scope` skipped).
 - Immediate next step: localisation Stage 2 (YAML key existence/coverage indexing and semantic validation wiring).
+- Localisation implementation reset decision (2026-02-09):
+  - use a single architecture path only: extend shared lexer with explicit options/mode for localisation, and consume that in localisation parsing.
+  - do not maintain dual parsing strategies (standalone line parser + lexer mode in parallel).
+  - localisation entries must preserve both `leading_trivia` and `trailing_trivia` around values for formatter robustness (including future column alignment policies).
+  - localisation files are UTF-8 BOM in practice; file parsing must read UTF-8 bytes, strip BOM from content, and retain BOM presence metadata for policy checks.
+  - localisation string values must be single-line; if quote start does not close on the same line, emit unterminated-string diagnostic.
+  - keep boundaries explicit:
+    - shared lexer/token infrastructure remains the source of lexical behavior,
+    - localisation module remains a thin grammar/adapter over shared infrastructure,
+    - no second independent parser stack.
 - Localisation Stage 2 implementation blueprint (approved evaluation):
   - Reuse parser pipeline architecture (lexer/buffered lexer/token source/event parser/tree sink) with a dedicated localisation grammar module, not rules/Jomini grammar reuse.
   - Keep implementation scope to lossless parse artifacts + index/facts; do not build red wrappers/AST unless later features require it.

@@ -19,6 +19,7 @@ For every parser/CST/AST feature, record:
 | Lossless tree sink | `biome_parser/src/tree_sink.rs` | `jominipy/parser/tree_sink.py` | matched | EOF insertion + trivia attachment behavior implemented |
 | Recovery primitives | `biome_parser/src/parse_recovery.rs` | `jominipy/parser/parse_recovery.py` | adapted | Token-set recovery + line-break recovery implemented; parser now suppresses duplicate diagnostics at the same token start to match Biome error-reporting behavior |
 | List parse loops | `biome_parser/src/parse_lists.rs` | `jominipy/parser/parse_lists.py` | adapted | Node-list helper implemented and in use; separated-list helper intentionally deferred until a real separator-driven Jomini construct requires it |
+| Localisation lexer mode/options | `biome_*_parser` per-language mode/config pattern | `jominipy/lexer/lexer.py` (+ localisation adapter) | pending | Decision locked (2026-02-09): localisation must consume shared lexer via mode/options; avoid dual parser paths |
 | Parser progress/stall guard | `biome_parser/src/lib.rs` (`ParserProgress`) | `jominipy/parser/parser.py` | matched | Stall detection used in list parsing |
 | Parser checkpoint/rewind | `biome_parser/src/lib.rs` | `jominipy/parser/parser.py` | adapted | Parser-level checkpoint object implemented |
 | Speculative parsing guard | `biome_parser/src/lib.rs` | `jominipy/parser/parser.py` | adapted | Context-managed speculative depth implemented |
@@ -92,6 +93,11 @@ For every parser/CST/AST feature, record:
   - update (2026-02-08): strict scope precedence compatibility landed:
     - when a declaration has both `push_scope` and `replace_scope`, typecheck now applies CWTools precedence (`push_scope` wins; same-path `replace_scope` skipped),
     - precedence behavior is locked by explicit regression tests.
+  - update (2026-02-09): localisation parser architecture reset requirement:
+    - implement one-path ingestion only (shared lexer options + localisation adapter),
+    - preserve both leading and trailing value trivia for formatter parity,
+    - keep localisation values single-line and emit unterminated diagnostics for unclosed same-line quotes,
+    - keep BOM-aware file ingestion metadata without introducing a second parser stack.
 
 ## Phase 0 parity gate checklist
 1. Every planned subsystem has at least one concrete Biome reference module in this file.

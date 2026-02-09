@@ -160,6 +160,12 @@ Phase 1.1 progress:
   - localisation sequencing requirement:
     1. command/scope semantics from `localisation.cwt` providers first (landed)
     2. localisation YAML key existence/coverage indexing second (next execution slice)
+  - localisation parser implementation constraints (2026-02-09 decision):
+    1. use shared lexer with explicit localisation mode/options and consume it from localisation module.
+    2. avoid dual-path parsing strategies; if lexer mode is adopted, localisation adapter must use that path exclusively.
+    3. preserve both leading/trailing trivia around localisation values for formatter-safe round-trip behavior.
+    4. treat localisation values as single-line only; unclosed same-line quotes must emit unterminated diagnostics.
+    5. parse files from UTF-8 bytes with BOM-awareness (strip for parsing, retain BOM presence metadata).
   - harden parity edge cases for alias/subtype/complex-enum semantics against CWTools behavior (`type_key_filter`, `starts_with`, subtype `push_scope`, complex enum edge-path semantics).
   - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 

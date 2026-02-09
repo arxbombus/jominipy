@@ -35,6 +35,13 @@ This document defines the architecture we are implementing in jominipy.
   - special-file semantic ingestion (`links`, `modifiers`, `values`, `localisation`)
   - localisation command/scope semantics as precomputed artifacts (not runtime callback-driven validation)
 
+## Localisation Parsing Boundary (2026-02-09)
+- Localisation parsing must remain a thin adapter over shared lexer/token infrastructure.
+- If localisation-specific lexer behavior is needed, implement it through lexer mode/options, not a second parser stack.
+- Localisation entries must preserve both leading and trailing trivia around values to support robust formatting and alignment.
+- Localisation values are treated as single-line payloads; unclosed same-line quotes must emit unterminated diagnostics.
+- File ingestion must be UTF-8 BOM-aware (strip BOM for parsing while retaining BOM-presence metadata).
+
 ## Toolchain scope (Biome-style)
 jominipy is a Biome-style toolchain for Paradox game scripts (Jomini/Clausewitz). The library provides:
 - Parser
