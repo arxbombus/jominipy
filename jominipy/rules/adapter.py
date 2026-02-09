@@ -89,6 +89,15 @@ class LocalisationCommandDefinition:
     supported_scopes: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class TypeLocalisationTemplate:
+    """Normalized type-localisation template declaration."""
+
+    template: str
+    required: bool = False
+    subtype_name: str | None = None
+
+
 def build_alias_members_by_family(schema: RuleSchemaGraph) -> dict[str, frozenset[str]]:
     """Build alias-family membership maps from `alias[family:name]` declarations."""
     aliases: dict[str, set[str]] = {}
@@ -340,6 +349,26 @@ def build_localisation_command_definitions(
     return commands
 
 
+def build_type_localisation_templates_by_type(
+    schema: RuleSchemaGraph,
+) -> dict[str, tuple[TypeLocalisationTemplate, ...]]:
+    """Build per-type localisation templates from `type[...]` declarations."""
+    templates_by_type: dict[str, list[TypeLocalisationTemplate]] = {}
+    for type_key, declarations in schema.types_by_key.items():
+        bucket = templates_by_type.setdefault(type_key, [])
+        for declaration in declarations:
+            statement = declaration.statement
+            if statement.value.kind != "block":
+                continue
+            for child in statement.value.block:
+                if child.kind != "key_value" or child.key != "localisation":
+                    continue
+                if child.value.kind != "block":
+                    continue
+                bucket.extend(_collect_type_localisation_templates(child.value.block))
+    return {type_key: tuple(templates) for type_key, templates in templates_by_type.items() if templates}
+
+
 @lru_cache(maxsize=1)
 def load_hoi4_values_memberships_by_key() -> dict[str, frozenset[str]]:
     """Load special-file values memberships from HOI4 schema."""
@@ -366,6 +395,13 @@ def load_hoi4_localisation_command_definitions() -> dict[str, LocalisationComman
     """Load special-file localisation command definitions from HOI4 schema."""
     schema = load_hoi4_schema_graph()
     return build_localisation_command_definitions(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_type_localisation_templates_by_type() -> dict[str, tuple[TypeLocalisationTemplate, ...]]:
+    """Load per-type localisation templates from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_type_localisation_templates_by_type(schema)
 
 
 def build_subtype_matchers_by_object(schema: RuleSchemaGraph) -> dict[str, tuple[SubtypeMatcher, ...]]:
@@ -442,6 +478,43 @@ def _find_scalar_child(statements: tuple[RuleStatement, ...], key: str) -> str |
             continue
         return (statement.value.text or "").strip().strip('"')
     return None
+
+
+def _collect_type_localisation_templates(
+    statements: tuple[RuleStatement, ...],
+    *,
+    subtype_name: str | None = None,
+) -> tuple[TypeLocalisationTemplate, ...]:
+    templates: list[TypeLocalisationTemplate] = []
+    seen: set[tuple[str, bool, str | None]] = set()
+    for statement in statements:
+        if statement.kind != "key_value" or statement.key is None:
+            continue
+        nested_subtype = _subtype_name(statement.key)
+        if nested_subtype is not None and statement.value.kind == "block":
+            for item in _collect_type_localisation_templates(
+                statement.value.block,
+                subtype_name=nested_subtype,
+            ):
+                dedupe = (item.template, item.required, item.subtype_name)
+                if dedupe in seen:
+                    continue
+                seen.add(dedupe)
+                templates.append(item)
+            continue
+        if statement.value.kind != "scalar":
+            continue
+        template = (statement.value.text or "").strip().strip('"')
+        if not template or "$" not in template:
+            continue
+        required = any(flag.lower() == "required" for flag in statement.metadata.flags)
+        item = TypeLocalisationTemplate(template=template, required=required, subtype_name=subtype_name)
+        dedupe = (item.template, item.required, item.subtype_name)
+        if dedupe in seen:
+            continue
+        seen.add(dedupe)
+        templates.append(item)
+    return tuple(templates)
 
 
 def _collect_modifier_category_scopes(schema: RuleSchemaGraph) -> dict[str, tuple[str, ...]]:

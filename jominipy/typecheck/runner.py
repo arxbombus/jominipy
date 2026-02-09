@@ -140,6 +140,12 @@ def _bind_services_to_rules(
             replacements["localisation_command_definitions_by_name"] = (
                 services.localisation_command_definitions_by_name
             )
+        if hasattr(rule, "type_localisation_templates_by_type") and not getattr(
+            rule, "type_localisation_templates_by_type"
+        ):
+            replacements["type_localisation_templates_by_type"] = (
+                services.type_localisation_templates_by_type
+            )
         if hasattr(rule, "localisation_key_provider") and getattr(
             rule, "localisation_key_provider"
         ).is_empty:

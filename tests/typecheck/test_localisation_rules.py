@@ -9,12 +9,14 @@ from jominipy.rules import (
     LocalisationCommandDefinition,
     RuleFieldConstraint,
     RuleValueSpec,
+    TypeLocalisationTemplate,
 )
 from jominipy.rules.semantics import RuleFieldScopeConstraint
 from jominipy.typecheck.rules import (
     ErrorIfOnlyMatchRule,
     LocalisationCommandScopeRule,
     LocalisationKeyExistenceRule,
+    TypeLocalisationRequirementRule,
 )
 from jominipy.typecheck.services import (
     TypecheckPolicy,
@@ -188,6 +190,34 @@ def test_typecheck_error_if_only_match_skips_when_value_does_not_match() -> None
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))
     assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_type_localisation_requirement_rule_reports_missing_required_key() -> None:
+    provider = build_localisation_key_provider(
+        (
+            parse_localisation_text("""l_english:
+ship_alpha:0 "Ship Alpha"
+"""),
+            parse_localisation_text("""l_german:
+ship_alpha:0 "Schiff Alpha"
+"""),
+        )
+    )
+    custom_rule = TypeLocalisationRequirementRule(
+        type_memberships_by_key={"ship_size": frozenset({"ship_alpha"})},
+        type_localisation_templates_by_type={
+            "ship_size": (
+                TypeLocalisationTemplate(template="$", required=False),
+                TypeLocalisationTemplate(template="$_desc", required=True),
+            )
+        },
+        localisation_key_provider=provider,
+        policy=TypecheckPolicy(localisation_coverage="any"),
+    )
+
+    typecheck_result = run_typecheck("technology={ desc = missing_loc_key }\n", rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "Missing required localisation key `ship_alpha_desc`" in typecheck_result.diagnostics[0].message
 
 
 def test_typecheck_services_include_modifier_and_localisation_providers() -> None:

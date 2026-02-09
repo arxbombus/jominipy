@@ -7,6 +7,7 @@ from jominipy.rules import (
     RuleFieldConstraint,
     RuleSchemaGraph,
     RuleValueSpec,
+    TypeLocalisationTemplate,
     build_alias_members_by_family,
     build_complex_enum_definitions,
     build_complex_enum_values_from_file_texts,
@@ -19,6 +20,7 @@ from jominipy.rules import (
     build_schema_graph,
     build_subtype_field_constraints_by_object,
     build_subtype_matchers_by_object,
+    build_type_localisation_templates_by_type,
     build_values_memberships_by_key,
     load_hoi4_enum_values,
     load_hoi4_known_scopes,
@@ -291,6 +293,34 @@ alias[trigger:has_government] = bool
     memberships = build_alias_members_by_family(schema)
     assert memberships["effect"] == frozenset({"add_stability", "add_war_support"})
     assert memberships["trigger"] == frozenset({"has_government"})
+
+
+def test_type_localisation_templates_are_extracted_from_type_declarations() -> None:
+    source = """types = {
+    type[ship_size] = {
+        localisation = {
+            name = "$"
+            ## required
+            required_desc = "$_desc"
+            subtype[advanced] = {
+                ## required
+                advanced_desc = "$_advanced_desc"
+            }
+        }
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-type-localisation.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    templates = build_type_localisation_templates_by_type(schema)
+    assert templates["ship_size"] == (
+        TypeLocalisationTemplate(template="$", required=False, subtype_name=None),
+        TypeLocalisationTemplate(template="$_desc", required=True, subtype_name=None),
+        TypeLocalisationTemplate(template="$_advanced_desc", required=True, subtype_name="advanced"),
+    )
 
 
 def test_subtype_matchers_are_extracted_from_type_definitions() -> None:

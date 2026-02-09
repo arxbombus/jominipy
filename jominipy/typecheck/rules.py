@@ -24,7 +24,11 @@ from jominipy.diagnostics import (
     Diagnostic,
 )
 from jominipy.localisation.keys import LocalisationKeyProvider
-from jominipy.rules.adapter import LinkDefinition, SubtypeMatcher
+from jominipy.rules.adapter import (
+    LinkDefinition,
+    SubtypeMatcher,
+    TypeLocalisationTemplate,
+)
 from jominipy.rules.semantics import (
     RuleFieldConstraint,
     RuleFieldScopeConstraint,
@@ -492,6 +496,77 @@ class LocalisationKeyExistenceRule:
 
 
 @dataclass(frozen=True, slots=True)
+class TypeLocalisationRequirementRule:
+    """Checks required type-localisation templates against loaded localisation keys."""
+
+    code: str = TYPECHECK_INVALID_FIELD_REFERENCE.code
+    name: str = "typeLocalisationRequirement"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    type_memberships_by_key: Mapping[str, frozenset[str]] = MappingProxyType({})
+    type_localisation_templates_by_type: Mapping[str, tuple[TypeLocalisationTemplate, ...]] = MappingProxyType({})
+    localisation_key_provider: LocalisationKeyProvider = LocalisationKeyProvider()
+    policy: TypecheckPolicy = TypecheckPolicy()
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        if self.localisation_key_provider.is_empty:
+            return []
+
+        diagnostics: list[Diagnostic] = []
+        for type_key, templates in sorted(self.type_localisation_templates_by_type.items()):
+            members = self.type_memberships_by_key.get(type_key)
+            if not members:
+                continue
+            required_templates = tuple(template for template in templates if template.required)
+            if not required_templates:
+                continue
+            for member in sorted(members):
+                for template in required_templates:
+                    key = template.template.replace("$", member)
+                    if not self.localisation_key_provider.has_key(key):
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Missing required localisation key `{key}` for type `{type_key}` member `{member}`."
+                                ),
+                                range=TextRange.empty(TextSize(0)),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Define this required localisation key or update the type localisation template.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
+                        continue
+                    if self.policy.localisation_coverage == "any":
+                        continue
+                    required_locales = (
+                        self.policy.localisation_required_locales
+                        if self.policy.localisation_required_locales
+                        else self.localisation_key_provider.locales
+                    )
+                    missing = self.localisation_key_provider.missing_locales_for_key(
+                        key,
+                        required_locales=required_locales,
+                    )
+                    if missing:
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Required localisation key `{key}` is missing locales: {', '.join(missing)}."
+                                ),
+                                range=TextRange.empty(TextSize(0)),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Add missing locale entries or relax localisation coverage policy.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
+        return diagnostics
+
+
+@dataclass(frozen=True, slots=True)
 class LocalisationCommandScopeRule:
     """Checks localisation command usage against `localisation_commands` scope metadata."""
 
@@ -790,6 +865,12 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             localisation_key_provider=resolved_services.localisation_key_provider,
             subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
+            policy=resolved_services.policy,
+        ),
+        TypeLocalisationRequirementRule(
+            type_memberships_by_key=resolved_services.type_memberships_by_key,
+            type_localisation_templates_by_type=resolved_services.type_localisation_templates_by_type,
+            localisation_key_provider=resolved_services.localisation_key_provider,
             policy=resolved_services.policy,
         ),
         LocalisationCommandScopeRule(

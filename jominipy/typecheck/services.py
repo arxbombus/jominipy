@@ -15,6 +15,7 @@ from jominipy.rules.adapter import (
     LocalisationCommandDefinition,
     ModifierDefinition,
     SubtypeMatcher,
+    TypeLocalisationTemplate,
 )
 from jominipy.rules.semantics import RuleFieldConstraint
 from jominipy.typecheck.assets import AssetRegistry, NullAssetRegistry
@@ -69,6 +70,9 @@ class TypecheckServices:
     localisation_command_definitions_by_name: Mapping[str, LocalisationCommandDefinition] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    type_localisation_templates_by_type: Mapping[str, tuple[TypeLocalisationTemplate, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
     localisation_key_provider: LocalisationKeyProvider = field(
         default_factory=LocalisationKeyProvider
     )
@@ -95,6 +99,7 @@ def build_typecheck_services_from_file_texts(
         load_hoi4_schema_graph,
         load_hoi4_subtype_field_constraints_by_object,
         load_hoi4_subtype_matchers_by_object,
+        load_hoi4_type_localisation_templates_by_type,
         load_hoi4_values_memberships_by_key,
     )
 
@@ -113,6 +118,7 @@ def build_typecheck_services_from_file_texts(
     merged_value_memberships = _merge_memberships(value_memberships, special_value_memberships)
     modifier_definitions = load_hoi4_modifier_definitions()
     localisation_command_definitions = load_hoi4_localisation_command_definitions()
+    type_localisation_templates = load_hoi4_type_localisation_templates_by_type()
     modifier_names = frozenset(modifier_definitions.keys())
     alias_memberships = _merge_family_memberships(
         load_hoi4_alias_members_by_family(),
@@ -141,6 +147,7 @@ def build_typecheck_services_from_file_texts(
         link_definitions_by_name=MappingProxyType(load_hoi4_link_definitions()),
         modifier_definitions_by_name=MappingProxyType(modifier_definitions),
         localisation_command_definitions_by_name=MappingProxyType(localisation_command_definitions),
+        type_localisation_templates_by_type=MappingProxyType(type_localisation_templates),
         localisation_key_provider=LocalisationKeyProvider(),
     )
 
@@ -174,6 +181,7 @@ def build_typecheck_services_from_project_root(
         link_definitions_by_name=services.link_definitions_by_name,
         modifier_definitions_by_name=services.modifier_definitions_by_name,
         localisation_command_definitions_by_name=services.localisation_command_definitions_by_name,
+        type_localisation_templates_by_type=services.type_localisation_templates_by_type,
         localisation_key_provider=load_localisation_key_provider_from_project_root(project_root=project_root),
     )
 
