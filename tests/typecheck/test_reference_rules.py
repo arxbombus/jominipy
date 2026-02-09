@@ -220,6 +220,176 @@ def test_typecheck_alias_execution_rule_validates_single_alias_invocation() -> N
     assert "Alias child `clause.count`" in typecheck_result.diagnostics[0].message
 
 
+def test_typecheck_alias_execution_rule_reports_unknown_dynamic_key_in_strict_mode() -> None:
+    source = """technology = {
+    immediate = {
+        unknown_effect = yes
+    }
+}
+"""
+    custom_rule = AliasExecutionRule(
+        alias_definitions_by_family={
+            "effect": {
+                "add_stability": AliasDefinition(
+                    family="effect",
+                    name="add_stability",
+                    value_specs=(RuleValueSpec(kind="primitive", raw="bool", primitive="bool", argument=None),),
+                    field_constraints={},
+                )
+            }
+        },
+        alias_invocations_by_object={
+            "technology": (
+                AliasInvocation(family="effect", parent_path=("technology", "immediate")),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "Unknown alias key `unknown_effect`" in typecheck_result.diagnostics[0].message
+
+
+def test_typecheck_alias_execution_rule_defers_unknown_dynamic_key_when_configured() -> None:
+    source = """technology = {
+    immediate = {
+        unknown_effect = yes
+    }
+}
+"""
+    custom_rule = AliasExecutionRule(
+        alias_definitions_by_family={
+            "effect": {
+                "add_stability": AliasDefinition(
+                    family="effect",
+                    name="add_stability",
+                    value_specs=(RuleValueSpec(kind="primitive", raw="bool", primitive="bool", argument=None),),
+                    field_constraints={},
+                )
+            }
+        },
+        alias_invocations_by_object={
+            "technology": (
+                AliasInvocation(family="effect", parent_path=("technology", "immediate")),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="defer"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_alias_execution_rule_applies_subtype_gated_invocation_only_to_matching_objects() -> None:
+    source = (
+        "ship_size = {\n"
+        "    class = shipclass_starbase\n"
+        "    immediate = {\n"
+        "        add_stability = {\n"
+        "            foo = yes\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+        "ship_size = {\n"
+        "    class = shipclass_military\n"
+        "    immediate = {\n"
+        "        add_stability = {\n"
+        "            foo = yes\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+    )
+    custom_rule = AliasExecutionRule(
+        alias_definitions_by_family={
+            "effect": {
+                "add_stability": AliasDefinition(
+                    family="effect",
+                    name="add_stability",
+                    value_specs=(RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),),
+                    field_constraints={
+                        "amount": RuleFieldConstraint(
+                            required=True,
+                            value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                        )
+                    },
+                )
+            }
+        },
+        alias_invocations_by_object={
+            "ship_size": (
+                AliasInvocation(
+                    family="effect",
+                    parent_path=("ship_size", "immediate"),
+                    required_subtype="starbase",
+                ),
+            )
+        },
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(subtype_name="starbase", expected_field_values=(("class", "shipclass_starbase"),)),
+                SubtypeMatcher(subtype_name="ship", expected_field_values=(("class", "shipclass_military"),)),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "missing required child field `amount`" in typecheck_result.diagnostics[0].message
+
+
+def test_typecheck_alias_execution_rule_applies_subtype_gated_single_alias_only_to_matching_objects() -> None:
+    source = (
+        "ship_size = {\n"
+        "    class = shipclass_starbase\n"
+        "    clause = {\n"
+        "        count = yes\n"
+        "    }\n"
+        "}\n"
+        "ship_size = {\n"
+        "    class = shipclass_military\n"
+        "    clause = {\n"
+        "        count = yes\n"
+        "    }\n"
+        "}\n"
+    )
+    custom_rule = AliasExecutionRule(
+        single_alias_definitions_by_name={
+            "test_clause": SingleAliasDefinition(
+                name="test_clause",
+                value_specs=(RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),),
+                field_constraints={
+                    "count": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                    )
+                },
+            )
+        },
+        single_alias_invocations_by_object={
+            "ship_size": (
+                SingleAliasInvocation(
+                    alias_name="test_clause",
+                    field_path=("ship_size", "clause"),
+                    required_subtype="starbase",
+                ),
+            )
+        },
+        subtype_matchers_by_object={
+            "ship_size": (
+                SubtypeMatcher(subtype_name="starbase", expected_field_values=(("class", "shipclass_starbase"),)),
+                SubtypeMatcher(subtype_name="ship", expected_field_values=(("class", "shipclass_military"),)),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "Alias child `clause.count`" in typecheck_result.diagnostics[0].message
+
+
 def test_typecheck_field_constraint_rule_applies_subtype_gating_per_object_occurrence() -> None:
     source = (
         "ship_size={ class=shipclass_starbase max_wings=yes }\nship_size={ class=shipclass_military max_wings=yes }\n"

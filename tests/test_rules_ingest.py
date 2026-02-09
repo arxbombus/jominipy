@@ -368,6 +368,40 @@ technology = {
     )
 
 
+def test_alias_and_single_alias_invocations_capture_subtype_context() -> None:
+    source = """technology = {
+    subtype[advanced] = {
+        immediate = {
+            alias_name[effect] = alias_match_left[effect]
+        }
+        clause = single_alias_right[test_clause]
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-subtype-alias-invocations.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    alias_invocations = build_alias_invocations_by_object(schema)
+    single_alias_invocations = build_single_alias_invocations_by_object(schema)
+
+    assert alias_invocations["technology"] == (
+        AliasInvocation(
+            family="effect",
+            parent_path=("technology", "subtype[advanced]", "immediate"),
+            required_subtype="advanced",
+        ),
+    )
+    assert single_alias_invocations["technology"] == (
+        SingleAliasInvocation(
+            alias_name="test_clause",
+            field_path=("technology", "subtype[advanced]", "clause"),
+            required_subtype="advanced",
+        ),
+    )
+
+
 def test_type_localisation_templates_are_extracted_from_type_declarations() -> None:
     source = """types = {
     type[ship_size] = {

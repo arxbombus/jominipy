@@ -158,6 +158,9 @@ Phase 1.1 progress:
 - Completed (expanded): Phase 5 alias/single-alias execution parity pass:
   - alias/single-alias definitions + invocation-path artifacts extracted from schema adapters,
   - typecheck alias execution rule validates invocation blocks against extracted constraints.
+- Completed (hardening): alias/single-alias unresolved/dynamic + subtype interaction parity:
+  - strict `unresolved_reference` behavior for unknown dynamic alias keys/families (`defer` vs `error`),
+  - subtype-gated alias/single-alias invocation enforcement per object occurrence.
 - Completed (initial): Phase 5 subtype gating/materialization (deterministic per-object subtype matcher gating + subtype-conditional field constraints).
 - Completed (initial): Phase 5 complex enum materialization (project-file scanning with `name` tree, `start_from_root`, and path filters).
 - Completed (initial): Phase 5 special-file provider pass 1 (`values` memberships + `links` definitions wired into scope-ref checks).
@@ -187,7 +190,6 @@ Phase 1.1 progress:
   - parked optimization note:
     - experimental lexer micro-optimization variant is preserved at `jominipy/lexer/faster_lexer.py` and intentionally not active runtime code at this stage.
   - harden parity edge cases for alias/subtype/complex-enum semantics against CWTools behavior (`type_key_filter`, `starts_with`, subtype `push_scope`, complex enum edge-path semantics).
-  - harden alias/single-alias unresolved/dynamic invocation policy edges (`defer` vs strict error) and subtype-gated invocation interactions.
   - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 
 Boundary constraints (must remain true):

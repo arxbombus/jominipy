@@ -115,6 +115,7 @@ class AliasInvocation:
 
     family: str
     parent_path: tuple[str, ...]
+    required_subtype: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +133,7 @@ class SingleAliasInvocation:
 
     alias_name: str
     field_path: tuple[str, ...]
+    required_subtype: str | None = None
 
 
 def build_alias_members_by_family(schema: RuleSchemaGraph) -> dict[str, frozenset[str]]:
@@ -706,6 +708,7 @@ def _collect_alias_invocations(
     *,
     path: tuple[str, ...],
     output: list[AliasInvocation],
+    subtype_name: str | None = None,
 ) -> None:
     for statement in statements:
         if statement.kind != "key_value" or statement.key is None:
@@ -717,13 +720,21 @@ def _collect_alias_invocations(
                 spec.kind == "alias_match_left_ref" and (spec.argument or "").strip() == family
                 for spec in specs
             ):
-                output.append(AliasInvocation(family=family, parent_path=path))
+                output.append(
+                    AliasInvocation(
+                        family=family,
+                        parent_path=path,
+                        required_subtype=subtype_name,
+                    )
+                )
         child_path = (*path, statement.key)
         if statement.value.kind == "block":
+            nested_subtype = _subtype_name(statement.key)
             _collect_alias_invocations(
                 statement.value.block,
                 path=child_path,
                 output=output,
+                subtype_name=nested_subtype if nested_subtype is not None else subtype_name,
             )
 
 
@@ -732,6 +743,7 @@ def _collect_single_alias_invocations(
     *,
     path: tuple[str, ...],
     output: list[SingleAliasInvocation],
+    subtype_name: str | None = None,
 ) -> None:
     for statement in statements:
         if statement.kind != "key_value" or statement.key is None:
@@ -744,12 +756,20 @@ def _collect_single_alias_invocations(
             alias_name = (spec.argument or "").strip()
             if not alias_name:
                 continue
-            output.append(SingleAliasInvocation(alias_name=alias_name, field_path=child_path))
+            output.append(
+                SingleAliasInvocation(
+                    alias_name=alias_name,
+                    field_path=child_path,
+                    required_subtype=subtype_name,
+                )
+            )
         if statement.value.kind == "block":
+            nested_subtype = _subtype_name(statement.key)
             _collect_single_alias_invocations(
                 statement.value.block,
                 path=child_path,
                 output=output,
+                subtype_name=nested_subtype if nested_subtype is not None else subtype_name,
             )
 
 
@@ -778,9 +798,9 @@ def _dedupe_alias_invocations(
     invocations: list[AliasInvocation],
 ) -> list[AliasInvocation]:
     deduped: list[AliasInvocation] = []
-    seen: set[tuple[str, tuple[str, ...]]] = set()
+    seen: set[tuple[str, tuple[str, ...], str | None]] = set()
     for invocation in invocations:
-        key = (invocation.family, invocation.parent_path)
+        key = (invocation.family, invocation.parent_path, invocation.required_subtype)
         if key in seen:
             continue
         seen.add(key)
@@ -792,9 +812,13 @@ def _dedupe_single_alias_invocations(
     invocations: list[SingleAliasInvocation],
 ) -> list[SingleAliasInvocation]:
     deduped: list[SingleAliasInvocation] = []
-    seen: set[tuple[str, tuple[str, ...]]] = set()
+    seen: set[tuple[str, tuple[str, ...], str | None]] = set()
     for invocation in invocations:
-        key = (invocation.alias_name, invocation.field_path)
+        key = (
+            invocation.alias_name,
+            invocation.field_path,
+            invocation.required_subtype,
+        )
         if key in seen:
             continue
         seen.add(key)

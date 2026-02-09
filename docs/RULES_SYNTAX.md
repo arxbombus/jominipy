@@ -53,7 +53,9 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Full type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms) against project-discovered members.
 - [ ] Final scope-resolution hardening (`scope[...]` + alias chain) across deeper cross-object flows and remaining non-trivial replacement edge cases.
 - [ ] Full value/value_set dynamic validation across files and execution scopes.
-- [ ] Full alias/single-alias hardening beyond current execution pass (remaining unresolved-policy, dynamic invocation, and subtype-interaction parity edges).
+- [x] Alias/single-alias hardening beyond initial execution pass:
+  - strict `unresolved_reference` handling for unknown dynamic alias keys/families (`defer` vs `error`),
+  - subtype-gated alias/single-alias invocation application per object occurrence.
 - [ ] Full subtype semantics (`type_key_filter`, `starts_with`, subtype `push_scope`, ordering/precedence edge cases) beyond current field-value matcher gating.
 - [ ] Full complex enum semantics parity (additional path/structure edge cases and parity verification against CWTools behavior).
 - [ ] Full special-file semantics parity (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
@@ -61,7 +63,6 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Complete migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
 
 ### Highest-priority parity gaps (full-surface audit)
-- [ ] Full alias/single-alias execution parity hardening (base execution now landed; remaining work is unresolved/dynamic invocation strictness and deeper edge-case parity).
 - [ ] Full subtype gating/materialization parity (`type_key_filter`, subtype `push_scope`, `starts_with`, ordering semantics).
 - [ ] Full complex enum parity hardening (current pass materializes enums from project files with `name` tree + `start_from_root` + path filters).
 - [ ] Special-file semantic ingestion hardening:

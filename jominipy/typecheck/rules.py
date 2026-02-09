@@ -7,7 +7,7 @@ import re
 from types import MappingProxyType
 from typing import Literal, Mapping, Protocol
 
-from jominipy.analysis import AnalysisFacts
+from jominipy.analysis import AnalysisFacts, FieldFact
 from jominipy.ast import (
     AstBlock,
     AstKeyValue,
@@ -583,6 +583,10 @@ class AliasExecutionRule:
     alias_invocations_by_object: Mapping[str, tuple[AliasInvocation, ...]] = MappingProxyType({})
     single_alias_definitions_by_name: Mapping[str, SingleAliasDefinition] = MappingProxyType({})
     single_alias_invocations_by_object: Mapping[str, tuple[SingleAliasInvocation, ...]] = MappingProxyType({})
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
+        MappingProxyType({})
+    )
     asset_registry: AssetRegistry = NullAssetRegistry()
     policy: TypecheckPolicy = TypecheckPolicy()
 
@@ -595,18 +599,78 @@ class AliasExecutionRule:
     def _run_alias_invocations(self, *, facts: AnalysisFacts, text: str) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
         for object_key, invocations in self.alias_invocations_by_object.items():
-            object_fields = tuple(field_fact for field_fact in facts.all_field_facts if field_fact.object_key == object_key)
+            object_fields: tuple[FieldFact, ...] = tuple(
+                field_fact for field_fact in facts.all_field_facts if field_fact.object_key == object_key
+            )
             if not object_fields:
                 continue
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            active_subtypes_by_occurrence: dict[int, tuple[str, ...]] = {}
             for invocation in invocations:
                 family_definitions = self.alias_definitions_by_family.get(invocation.family)
                 if not family_definitions:
+                    if self.policy.unresolved_reference == "defer":
+                        continue
+                    for field_fact in object_fields:
+                        if field_fact.path[:-1] != invocation.parent_path:
+                            continue
+                        if invocation.required_subtype is not None:
+                            active_subtypes = active_subtypes_by_occurrence.get(field_fact.object_occurrence)
+                            if active_subtypes is None:
+                                active_subtypes = _resolve_active_subtypes(
+                                    object_key=object_key,
+                                    object_occurrence=field_fact.object_occurrence,
+                                    matchers=subtype_matchers,
+                                    facts=facts,
+                                )
+                                active_subtypes_by_occurrence[field_fact.object_occurrence] = active_subtypes
+                            if invocation.required_subtype not in active_subtypes:
+                                continue
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Unknown alias family `{invocation.family}` for `{object_key}` invocation path."
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Define the alias family in rules or relax unresolved reference policy.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
                     continue
                 for field_fact in object_fields:
                     if field_fact.path[:-1] != invocation.parent_path:
                         continue
+                    if invocation.required_subtype is not None:
+                        active_subtypes = active_subtypes_by_occurrence.get(field_fact.object_occurrence)
+                        if active_subtypes is None:
+                            active_subtypes = _resolve_active_subtypes(
+                                object_key=object_key,
+                                object_occurrence=field_fact.object_occurrence,
+                                matchers=subtype_matchers,
+                                facts=facts,
+                            )
+                            active_subtypes_by_occurrence[field_fact.object_occurrence] = active_subtypes
+                        if invocation.required_subtype not in active_subtypes:
+                            continue
                     alias_definition = family_definitions.get(field_fact.field_key)
                     if alias_definition is None:
+                        if self.policy.unresolved_reference == "error":
+                            diagnostics.append(
+                                Diagnostic(
+                                    code=self.code,
+                                    message=(
+                                        f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                        f"Unknown alias key `{field_fact.field_key}` for family `{invocation.family}`."
+                                    ),
+                                    range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                    severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                    hint="Define the alias declaration or relax unresolved reference policy.",
+                                    category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                                )
+                            )
                         continue
                     diagnostics.extend(
                         _validate_alias_like_value(
@@ -627,46 +691,65 @@ class AliasExecutionRule:
     def _run_single_alias_invocations(self, *, facts: AnalysisFacts, text: str) -> list[Diagnostic]:
         diagnostics: list[Diagnostic] = []
         for object_key, invocations in self.single_alias_invocations_by_object.items():
-            object_fields = tuple(field_fact for field_fact in facts.all_field_facts if field_fact.object_key == object_key)
+            object_fields: tuple[FieldFact, ...] = tuple(
+                field_fact for field_fact in facts.all_field_facts if field_fact.object_key == object_key
+            )
             if not object_fields:
                 continue
-            by_path = {field_fact.path: field_fact for field_fact in object_fields}
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            active_subtypes_by_occurrence: dict[int, tuple[str, ...]] = {}
+            by_path: dict[tuple[str, ...], list[FieldFact]] = {}
+            for field_fact in object_fields:
+                by_path.setdefault(field_fact.path, []).append(field_fact)
             for invocation in invocations:
-                field_fact = by_path.get(invocation.field_path)
-                if field_fact is None:
+                field_facts = by_path.get(invocation.field_path)
+                if not field_facts:
                     continue
-                definition = self.single_alias_definitions_by_name.get(invocation.alias_name)
-                if definition is None:
-                    if self.policy.unresolved_reference == "defer":
+                for field_fact in field_facts:
+                    if invocation.required_subtype is not None:
+                        active_subtypes = active_subtypes_by_occurrence.get(field_fact.object_occurrence)
+                        if active_subtypes is None:
+                            active_subtypes = _resolve_active_subtypes(
+                                object_key=object_key,
+                                object_occurrence=field_fact.object_occurrence,
+                                matchers=subtype_matchers,
+                                facts=facts,
+                            )
+                            active_subtypes_by_occurrence[field_fact.object_occurrence] = active_subtypes
+                        if invocation.required_subtype not in active_subtypes:
+                            continue
+                    definition = self.single_alias_definitions_by_name.get(invocation.alias_name)
+                    if definition is None:
+                        if self.policy.unresolved_reference == "defer":
+                            continue
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Unknown single-alias `{invocation.alias_name}`."
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Define the single_alias declaration or remove the single_alias_right reference.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
                         continue
-                    diagnostics.append(
-                        Diagnostic(
-                            code=self.code,
-                            message=(
-                                f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
-                                f"Unknown single-alias `{invocation.alias_name}`."
-                            ),
-                            range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
-                            severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
-                            hint="Define the single_alias declaration or remove the single_alias_right reference.",
-                            category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                    diagnostics.extend(
+                        _validate_alias_like_value(
+                            object_key=object_key,
+                            object_occurrence=field_fact.object_occurrence,
+                            field_key=field_fact.field_key,
+                            value=field_fact.value,
+                            text=text,
+                            value_specs=definition.value_specs,
+                            field_constraints=definition.field_constraints,
+                            alias_definitions_by_family=self.alias_definitions_by_family,
+                            asset_registry=self.asset_registry,
+                            policy=self.policy,
                         )
                     )
-                    continue
-                diagnostics.extend(
-                    _validate_alias_like_value(
-                        object_key=object_key,
-                        object_occurrence=field_fact.object_occurrence,
-                        field_key=field_fact.field_key,
-                        value=field_fact.value,
-                        text=text,
-                        value_specs=definition.value_specs,
-                        field_constraints=definition.field_constraints,
-                        alias_definitions_by_family=self.alias_definitions_by_family,
-                        asset_registry=self.asset_registry,
-                        policy=self.policy,
-                    )
-                )
         return diagnostics
 
 
@@ -1016,8 +1099,11 @@ def _validate_alias_like_value(
             if child.key.raw_text in static_constraints:
                 continue
             matched_dynamic = False
+            known_families: list[str] = []
             for family in alias_families:
                 family_defs = alias_definitions_by_family.get(family, {})
+                if family_defs:
+                    known_families.append(family)
                 alias_definition = family_defs.get(child.key.raw_text)
                 if alias_definition is None:
                     continue
@@ -1038,6 +1124,22 @@ def _validate_alias_like_value(
                 )
             if matched_dynamic:
                 continue
+            if policy.unresolved_reference == "defer":
+                continue
+            diagnostics.append(
+                Diagnostic(
+                    code=TYPECHECK_INVALID_FIELD_REFERENCE.code,
+                    message=(
+                        f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                        f"Unknown alias key `{child.key.raw_text}` under `{field_key}`"
+                        f" for families: {', '.join(sorted(known_families or alias_families))}."
+                    ),
+                    range=_find_key_occurrence_range(text, object_key, object_occurrence),
+                    severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                    hint="Define the alias key in the referenced alias family or relax unresolved reference policy.",
+                    category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                )
+            )
     return diagnostics
 
 
@@ -1106,6 +1208,8 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             alias_invocations_by_object=resolved_services.alias_invocations_by_object,
             single_alias_definitions_by_name=resolved_services.single_alias_definitions_by_name,
             single_alias_invocations_by_object=resolved_services.single_alias_invocations_by_object,
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+            subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             asset_registry=resolved_services.asset_registry,
             policy=resolved_services.policy,
         ),
