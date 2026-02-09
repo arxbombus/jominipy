@@ -248,6 +248,8 @@ Every agent must perform this checklist before finishing a substantive task:
 - `uv run ruff check jominipy/rules/adapter.py jominipy/typecheck/rules.py tests/test_rules_ingest.py tests/typecheck/test_scope_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_reference_rules.py` (passed)
 - `uv run pyrefly check` (`0 errors`, `1 suppressed`)
 
+*adapter.py was split up into multiple files for long term maintainability and modularity, so we'll need to change some of the code above.
+
 ## Validation Snapshot (historical)
 - `uv run pytest tests/test_lint_typecheck_engines.py tests/typecheck/test_field_constraint_rules.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py tests/typecheck/test_services_and_facts.py tests/test_localisation_parser.py tests/test_localisation_keys.py` (`73 passed`)
     1. Add localisation parser mode/entrypoint and grammar (`parse_localisation_*`) while keeping existing Jomini parse path untouched.

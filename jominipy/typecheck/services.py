@@ -10,7 +10,7 @@ from jominipy.localisation.keys import (
     LocalisationKeyProvider,
     load_localisation_key_provider_from_project_root,
 )
-from jominipy.rules.adapter import (
+from jominipy.rules.adapters import (
     AliasDefinition,
     AliasInvocation,
     LinkDefinition,
@@ -43,22 +43,12 @@ class TypecheckServices:
 
     asset_registry: AssetRegistry = field(default_factory=NullAssetRegistry)
     policy: TypecheckPolicy = field(default_factory=TypecheckPolicy)
-    type_memberships_by_key: Mapping[str, frozenset[str]] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
-    value_memberships_by_key: Mapping[str, frozenset[str]] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
-    special_value_memberships_by_key: Mapping[str, frozenset[str]] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
+    type_memberships_by_key: Mapping[str, frozenset[str]] = field(default_factory=lambda: MappingProxyType({}))
+    value_memberships_by_key: Mapping[str, frozenset[str]] = field(default_factory=lambda: MappingProxyType({}))
+    special_value_memberships_by_key: Mapping[str, frozenset[str]] = field(default_factory=lambda: MappingProxyType({}))
     known_scopes: frozenset[str] = frozenset()
-    enum_memberships_by_key: Mapping[str, frozenset[str]] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
-    alias_memberships_by_family: Mapping[str, frozenset[str]] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
+    enum_memberships_by_key: Mapping[str, frozenset[str]] = field(default_factory=lambda: MappingProxyType({}))
+    alias_memberships_by_family: Mapping[str, frozenset[str]] = field(default_factory=lambda: MappingProxyType({}))
     alias_definitions_by_family: Mapping[str, Mapping[str, AliasDefinition]] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -77,21 +67,15 @@ class TypecheckServices:
     subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = field(
         default_factory=lambda: MappingProxyType({})
     )
-    link_definitions_by_name: Mapping[str, LinkDefinition] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
-    modifier_definitions_by_name: Mapping[str, ModifierDefinition] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
+    link_definitions_by_name: Mapping[str, LinkDefinition] = field(default_factory=lambda: MappingProxyType({}))
+    modifier_definitions_by_name: Mapping[str, ModifierDefinition] = field(default_factory=lambda: MappingProxyType({}))
     localisation_command_definitions_by_name: Mapping[str, LocalisationCommandDefinition] = field(
         default_factory=lambda: MappingProxyType({})
     )
     type_localisation_templates_by_type: Mapping[str, tuple[TypeLocalisationTemplate, ...]] = field(
         default_factory=lambda: MappingProxyType({})
     )
-    localisation_key_provider: LocalisationKeyProvider = field(
-        default_factory=LocalisationKeyProvider
-    )
+    localisation_key_provider: LocalisationKeyProvider = field(default_factory=LocalisationKeyProvider)
 
 
 def build_typecheck_services_from_file_texts(

@@ -134,12 +134,8 @@ def build_field_constraints_by_object(
                 value_specs=merged_specs,
                 comparison=existing.comparison or child.metadata.comparison,
                 error_if_only_match=existing.error_if_only_match or child.metadata.error_if_only_match,
-                outgoing_reference_label=(
-                    existing.outgoing_reference_label or child.metadata.outgoing_reference_label
-                ),
-                incoming_reference_label=(
-                    existing.incoming_reference_label or child.metadata.incoming_reference_label
-                ),
+                outgoing_reference_label=(existing.outgoing_reference_label or child.metadata.outgoing_reference_label),
+                incoming_reference_label=(existing.incoming_reference_label or child.metadata.incoming_reference_label),
             )
 
         if constraints:
@@ -310,7 +306,7 @@ def load_hoi4_field_constraints(
     include_implicit_required: bool = False,
 ) -> dict[str, dict[str, RuleFieldConstraint]]:
     """Load per-object field constraints from the HOI4 cross-file CWTools schema."""
-    from jominipy.rules.adapter import load_hoi4_expanded_field_constraints
+    from jominipy.rules.adapters import load_hoi4_expanded_field_constraints
 
     return load_hoi4_expanded_field_constraints(
         include_implicit_required=include_implicit_required,

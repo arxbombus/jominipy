@@ -1,6 +1,6 @@
 """CWTools-like rules ingest and normalized IR utilities."""
 
-from jominipy.rules.adapter import (
+from jominipy.rules.adapters import (
     AliasDefinition,
     AliasInvocation,
     ComplexEnumDefinition,
@@ -8,7 +8,6 @@ from jominipy.rules.adapter import (
     LinkDefinition,
     LocalisationCommandDefinition,
     ModifierDefinition,
-    NameTreePattern,
     SingleAliasDefinition,
     SingleAliasInvocation,
     SubtypeMatcher,
@@ -97,7 +96,6 @@ __all__ = [
     "LoadRulesResult",
     "LocalisationCommandDefinition",
     "ModifierDefinition",
-    "NameTreePattern",
     "RuleCardinality",
     "RuleExpression",
     "RuleFieldConstraint",

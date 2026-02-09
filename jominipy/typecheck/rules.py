@@ -25,7 +25,7 @@ from jominipy.diagnostics import (
     Diagnostic,
 )
 from jominipy.localisation.keys import LocalisationKeyProvider
-from jominipy.rules.adapter import (
+from jominipy.rules.adapters import (
     AliasDefinition,
     AliasInvocation,
     LinkDefinition,
@@ -1418,10 +1418,7 @@ def _matches_value_specs(
 ) -> bool:
     if not specs:
         return True
-    return any(
-        _matches_value_spec(value, spec, asset_registry=asset_registry, policy=policy)
-        for spec in specs
-    )
+    return any(_matches_value_spec(value, spec, asset_registry=asset_registry, policy=policy) for spec in specs)
 
 
 def _has_reference_specs(specs: tuple[RuleValueSpec, ...]) -> bool:
@@ -1934,10 +1931,7 @@ def _allows_localisation_primitive(specs: tuple[RuleValueSpec, ...]) -> bool:
 
 
 def _allows_localisation_key_primitive(specs: tuple[RuleValueSpec, ...]) -> bool:
-    return any(
-        spec.kind == "primitive" and spec.primitive in {"localisation", "localisation_synced"}
-        for spec in specs
-    )
+    return any(spec.kind == "primitive" and spec.primitive in {"localisation", "localisation_synced"} for spec in specs)
 
 
 def _extract_localisation_key_reference(raw_text: str) -> str | None:
@@ -2075,18 +2069,18 @@ def _merge_value_specs(
     return tuple(merged)
 
 
-def _resolve_active_scopes_before_path(
-    *,
-    relative_path: tuple[str, ...],
-    by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
-    initial_push_scopes: tuple[str, ...] = (),
-) -> set[str]:
-    context = _resolve_scope_context_before_path(
-        relative_path=relative_path,
-        by_path=by_path,
-        initial_push_scopes=initial_push_scopes,
-    )
-    return set(context.active_scopes)
+# def _resolve_active_scopes_before_path(
+#     *,
+#     relative_path: tuple[str, ...],
+#     by_path: Mapping[tuple[str, ...], RuleFieldScopeConstraint],
+#     initial_push_scopes: tuple[str, ...] = (),
+# ) -> set[str]:
+#     context = _resolve_scope_context_before_path(
+#         relative_path=relative_path,
+#         by_path=by_path,
+#         initial_push_scopes=initial_push_scopes,
+#     )
+#     return set(context.active_scopes)
 
 
 def _resolve_scope_context_before_path(

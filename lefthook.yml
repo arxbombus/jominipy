@@ -6,6 +6,9 @@ commit-msg:
 pre-commit:
   parallel: true
   commands:
+    "Testing with Pytest":
+      run: uv run pytest tests
+
     "Type checking with Pyrefly":
       glob: "*.py"
       run: uv run pyrefly check {staged_files}
