@@ -98,6 +98,9 @@ For every parser/CST/AST feature, record:
     - `modifiers` + `modifier_categories` provider extraction wired into typecheck services,
     - `localisation_commands` provider extraction wired into typecheck services,
     - `links` `from_data` now enforces `data_source` membership during scope-link resolution (with unresolved defer/error policy).
+  - update (2026-02-09 current): modifier edge-policy hardening landed:
+    - typecheck now enforces `modifier_categories` scope compatibility for `alias_match_left[modifier]` references,
+    - strict mode now reports known modifiers with missing/empty scope metadata as unresolved metadata errors.
   - update (2026-02-08): localisation command/scope semantic enforcement landed:
     - typecheck now validates localisation commands used in localisation-typed fields against `localisation_commands` scope metadata,
     - unresolved command metadata follows typecheck unresolved-reference policy (`defer` vs `error`).

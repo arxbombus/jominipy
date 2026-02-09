@@ -25,17 +25,19 @@ Last updated: 2026-02-09
   - `path`, `path_file`, and `path_extension` matching now follows CWTools case-insensitive behavior,
   - complex enums with no configured `path` no longer match arbitrary files (matching CWTools path-filter behavior),
   - `enum_name = {}` now collects node keys only, while `enum_name = scalar` collects leaf keys only,
-  - type-safe narrowing was added in `complex_enums` traversal to satisfy strict static checking,
-  - `docs/RULES_SYNTAX.md` is synced with these parity semantics.
+  - type-safe narrowing was added in `complex_enums` traversal to satisfy strict static checking.
+- Modifiers edge-policy hardening landed:
+  - new `ModifierScopeRule` enforces `modifier_categories` scope compatibility for `alias_match_left[modifier]` references,
+  - strict unresolved policy now reports known modifiers with missing/empty scope metadata.
 
 ## Latest Validation Snapshot
 - `uv run pyrefly check` (`0 errors`)
-- `uv run pytest -q tests/test_rules_ingest.py -k "complex_enum" tests/typecheck/test_complex_enum_e2e.py` (`15 passed`)
-- `uv run ruff check jominipy/rules/adapters/complex_enums.py tests/test_rules_ingest.py tests/typecheck/test_complex_enum_e2e.py` (pass)
+- `uv run pytest -q tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py` (`58 passed`)
+- `uv run ruff check jominipy/typecheck/rules.py tests/typecheck/test_reference_rules.py` (pass)
 
 ## Exact Next Step
-1. Continue remaining special-file hardening (`modifiers` and `links` edge-policy parity).
-2. Re-run targeted rules/typecheck parity suites after each special-file edge-policy change.
+1. Continue remaining `links` long-tail edge-policy parity hardening.
+2. Keep targeted rules/typecheck parity suites in the regression loop while landing `links` changes.
 
 ## Notes
 - Historical logs are archived under `docs/archive/`.

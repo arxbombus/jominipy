@@ -79,6 +79,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
   - [x] `links.cwt` initial provider + scope-ref link-prefix/output-scope validation wiring.
   - [x] `values` section initial provider merged into `value[...]` memberships.
   - [x] initial `modifiers` + `modifier_categories` provider extraction and service wiring.
+  - [x] modifier scope-category enforcement in typecheck for `alias_match_left[modifier]` references (scope-context compatible usage).
   - [x] initial `localisation_commands` provider extraction and service wiring.
   - [x] deeper `links` pass: `from_data + data_source` membership gating in scope-ref resolution.
   - [x] initial localisation command/scope compatibility enforcement in typecheck from `localisation_commands`.

@@ -29,6 +29,7 @@ from jominipy.rules.adapters import (
     AliasDefinition,
     AliasInvocation,
     LinkDefinition,
+    ModifierDefinition,
     SingleAliasDefinition,
     SingleAliasInvocation,
     SubtypeMatcher,
@@ -770,6 +771,154 @@ class AliasExecutionRule:
 
 
 @dataclass(frozen=True, slots=True)
+class ModifierScopeRule:
+    """Checks modifier references against `modifier_categories` scope metadata."""
+
+    code: str = TYPECHECK_INVALID_FIELD_REFERENCE.code
+    name: str = "modifierScope"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    field_constraints_by_object: dict[str, dict[str, RuleFieldConstraint]] | None = None
+    modifier_definitions_by_name: Mapping[str, ModifierDefinition] = MappingProxyType({})
+    subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = MappingProxyType({})
+    subtype_field_constraints_by_object: Mapping[str, Mapping[str, Mapping[str, RuleFieldConstraint]]] = (
+        MappingProxyType({})
+    )
+    field_scope_constraints_by_object: dict[str, dict[tuple[str, ...], RuleFieldScopeConstraint]] | None = None
+    policy: TypecheckPolicy = TypecheckPolicy()
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        constraints = self.field_constraints_by_object
+        if constraints is None:
+            constraints = load_hoi4_field_constraints(include_implicit_required=False)
+        if not self.modifier_definitions_by_name:
+            return []
+        scope_constraints = self.field_scope_constraints_by_object
+        if scope_constraints is None:
+            scope_constraints = load_hoi4_field_scope_constraints()
+
+        diagnostics: list[Diagnostic] = []
+        for object_key, field_constraints in constraints.items():
+            field_map = facts.object_field_map.get(object_key)
+            if not field_map:
+                continue
+            subtype_matchers = self.subtype_matchers_by_object.get(object_key, ())
+            subtype_constraints = self.subtype_field_constraints_by_object.get(object_key, {})
+            field_names = set(field_constraints.keys())
+            for by_field in subtype_constraints.values():
+                field_names.update(by_field.keys())
+            for field_name in sorted(field_names):
+                field_facts = field_map.get(field_name)
+                if not field_facts:
+                    continue
+                for field_fact in field_facts:
+                    constraint = _resolve_effective_field_constraint(
+                        object_key=object_key,
+                        object_occurrence=field_fact.object_occurrence,
+                        field_name=field_name,
+                        base_constraints=field_constraints,
+                        subtype_matchers=subtype_matchers,
+                        subtype_constraints=subtype_constraints,
+                        facts=facts,
+                    )
+                    if constraint is None:
+                        continue
+                    if not _has_modifier_alias_spec(constraint.value_specs):
+                        continue
+                    if not isinstance(field_fact.value, AstScalar):
+                        continue
+                    modifier_name = _strip_scalar_quotes(field_fact.value.raw_text).strip()
+                    if not modifier_name:
+                        continue
+                    modifier_def = self.modifier_definitions_by_name.get(modifier_name)
+                    if modifier_def is None:
+                        # Membership checks for unknown modifiers are handled by FieldReferenceConstraintRule.
+                        continue
+
+                    supported_scopes = tuple(scope.lower() for scope in modifier_def.supported_scopes if scope)
+                    if "any" in supported_scopes:
+                        continue
+                    if not supported_scopes:
+                        if self.policy.unresolved_reference == "defer":
+                            continue
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Modifier `{modifier_name}` has no resolvable scope metadata."
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Define supported_scopes for its modifier category.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
+                        continue
+
+                    relative_path = field_fact.path[1:]
+                    scope_context = _resolve_scope_context_before_path(
+                        relative_path=relative_path,
+                        by_path=scope_constraints.get(object_key, {}),
+                        initial_push_scopes=_resolve_subtype_push_scopes(
+                            object_key=object_key,
+                            object_occurrence=field_fact.object_occurrence,
+                            matchers=subtype_matchers,
+                            facts=facts,
+                        ),
+                    )
+                    if scope_context.ambiguity is not None:
+                        diagnostics.append(
+                            Diagnostic(
+                                code=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.code,
+                                message=(
+                                    f"{TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.message} "
+                                    f"`{object_key}.{field_name}`: {scope_context.ambiguity}"
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.severity,
+                                hint="Remove conflicting replace_scope alias mappings.",
+                                category=TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT.category,
+                            )
+                        )
+                        continue
+                    if not scope_context.active_scopes:
+                        if self.policy.unresolved_reference == "defer":
+                            continue
+                        diagnostics.append(
+                            Diagnostic(
+                                code=self.code,
+                                message=(
+                                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                    f"Cannot resolve scope context for modifier `{modifier_name}`."
+                                ),
+                                range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                                hint="Set scope context via push_scope/replace_scope metadata.",
+                                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                            )
+                        )
+                        continue
+                    if set(scope_context.active_scopes).intersection(supported_scopes):
+                        continue
+                    diagnostics.append(
+                        Diagnostic(
+                            code=self.code,
+                            message=(
+                                f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                f"Modifier `{modifier_name}` is not valid for scope "
+                                f"{', '.join(sorted(scope_context.active_scopes))}."
+                            ),
+                            range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                            severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                            hint=f"Use a modifier valid for scopes: {', '.join(supported_scopes)}.",
+                            category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                        )
+                    )
+        return diagnostics
+
+
+@dataclass(frozen=True, slots=True)
 class LocalisationCommandScopeRule:
     """Checks localisation command usage against `localisation_commands` scope metadata."""
 
@@ -1178,6 +1327,13 @@ def _parse_alias_name_family(raw_key: str) -> str | None:
     return family or None
 
 
+def _has_modifier_alias_spec(specs: tuple[RuleValueSpec, ...]) -> bool:
+    return any(
+        spec.kind == "alias_match_left_ref" and (spec.argument or "").strip().lower() == "modifier"
+        for spec in specs
+    )
+
+
 def build_typecheck_facts(facts: AnalysisFacts) -> TypecheckFacts:
     inconsistent: dict[str, tuple[str, ...]] = {}
     for key, shapes in facts.top_level_shapes.items():
@@ -1239,6 +1395,12 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
             subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             asset_registry=resolved_services.asset_registry,
+            policy=resolved_services.policy,
+        ),
+        ModifierScopeRule(
+            modifier_definitions_by_name=resolved_services.modifier_definitions_by_name,
+            subtype_matchers_by_object=resolved_services.subtype_matchers_by_object,
+            subtype_field_constraints_by_object=resolved_services.subtype_field_constraints_by_object,
             policy=resolved_services.policy,
         ),
         LocalisationCommandScopeRule(

@@ -3,6 +3,7 @@ from jominipy.rules import (
     AliasDefinition,
     AliasInvocation,
     LinkDefinition,
+    ModifierDefinition,
     RuleFieldConstraint,
     RuleValueSpec,
     SingleAliasDefinition,
@@ -14,6 +15,7 @@ from jominipy.typecheck.rules import (
     AliasExecutionRule,
     FieldConstraintRule,
     FieldReferenceConstraintRule,
+    ModifierScopeRule,
 )
 from jominipy.typecheck.services import (
     TypecheckPolicy,
@@ -159,6 +161,116 @@ def test_typecheck_field_reference_rule_validates_alias_match_left_membership() 
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))
     assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_modifier_scope_rule_accepts_supported_scope() -> None:
+    source = "technology={ modifier_key = annex_cost_factor }\n"
+    custom_rule = ModifierScopeRule(
+        field_constraints_by_object={
+            "technology": {
+                "modifier_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(
+                            kind="alias_match_left_ref",
+                            raw="alias_match_left[modifier]",
+                            argument="modifier",
+                        ),
+                    ),
+                ),
+            }
+        },
+        modifier_definitions_by_name={
+            "annex_cost_factor": ModifierDefinition(
+                name="annex_cost_factor",
+                category="country",
+                supported_scopes=("country",),
+            )
+        },
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country",)),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_modifier_scope_rule_rejects_unsupported_scope() -> None:
+    source = "technology={ modifier_key = annex_cost_factor }\n"
+    custom_rule = ModifierScopeRule(
+        field_constraints_by_object={
+            "technology": {
+                "modifier_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(
+                            kind="alias_match_left_ref",
+                            raw="alias_match_left[modifier]",
+                            argument="modifier",
+                        ),
+                    ),
+                ),
+            }
+        },
+        modifier_definitions_by_name={
+            "annex_cost_factor": ModifierDefinition(
+                name="annex_cost_factor",
+                category="country",
+                supported_scopes=("country",),
+            )
+        },
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("state",)),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "Modifier `annex_cost_factor` is not valid for scope state." in typecheck_result.diagnostics[0].message
+
+
+def test_typecheck_modifier_scope_rule_reports_missing_scope_metadata_in_strict_mode() -> None:
+    source = "technology={ modifier_key = annex_cost_factor }\n"
+    custom_rule = ModifierScopeRule(
+        field_constraints_by_object={
+            "technology": {
+                "modifier_key": RuleFieldConstraint(
+                    required=False,
+                    value_specs=(
+                        RuleValueSpec(
+                            kind="alias_match_left_ref",
+                            raw="alias_match_left[modifier]",
+                            argument="modifier",
+                        ),
+                    ),
+                ),
+            }
+        },
+        modifier_definitions_by_name={
+            "annex_cost_factor": ModifierDefinition(
+                name="annex_cost_factor",
+                category="country",
+                supported_scopes=(),
+            )
+        },
+        field_scope_constraints_by_object={
+            "technology": {
+                (): RuleFieldScopeConstraint(push_scope=("country",)),
+            }
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "has no resolvable scope metadata" in typecheck_result.diagnostics[0].message
 
 
 def test_typecheck_alias_execution_rule_validates_alias_block_fields() -> None:
