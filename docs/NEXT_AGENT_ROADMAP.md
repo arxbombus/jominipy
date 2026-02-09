@@ -155,6 +155,9 @@ Phase 1.1 progress:
 - Completed (initial): Phase C primitive/range correctness in typecheck (`jominipy/typecheck/rules.py`) with lint/typecheck ownership migration for field-type constraints.
 - Completed (additional): registry-backed `filepath`/`icon` validation contract via `AssetRegistry` (`jominipy/typecheck/assets.py`) and typecheck integration.
 - Completed (initial): Phase 5 alias/single-alias adapter wiring (`single_alias_right[...]` expansion + `alias_match_left[...]` membership checks).
+- Completed (expanded): Phase 5 alias/single-alias execution parity pass:
+  - alias/single-alias definitions + invocation-path artifacts extracted from schema adapters,
+  - typecheck alias execution rule validates invocation blocks against extracted constraints.
 - Completed (initial): Phase 5 subtype gating/materialization (deterministic per-object subtype matcher gating + subtype-conditional field constraints).
 - Completed (initial): Phase 5 complex enum materialization (project-file scanning with `name` tree, `start_from_root`, and path filters).
 - Completed (initial): Phase 5 special-file provider pass 1 (`values` memberships + `links` definitions wired into scope-ref checks).
@@ -163,12 +166,15 @@ Phase 1.1 progress:
 - Completed: deeper links advanced-chain semantics (multi-segment chains and mixed prefixed segments with per-segment input/data-source gating).
 - Completed: Phase 6 option-surface parity (`comparison`, `error_if_only_match`, reference labels) with deterministic typecheck execution for `error_if_only_match`.
 - Completed: strict compatibility precedence for same-path `push_scope` + `replace_scope` (CWTools precedence: `push_scope` wins; same-path `replace_scope` skipped).
+- Completed (expanded): localisation required-template key parity:
+  - required type-localisation template extraction (`$` templates + `## required`) from rules adapters,
+  - typecheck enforcement against project localisation key provider.
 - Next:
   - execution priority reset (current): continue rules-module parity checklist first; do not spend additional cycles on localisation micro-optimizations until dedicated optimization phase.
   - localisation sequencing requirement:
     1. command/scope semantics from `localisation.cwt` providers first (landed)
-    2. localisation YAML key existence/coverage indexing second (initially landed via compact key-provider + typecheck rule wiring)
-    3. continue `LocalisationKeyProvider` policy/diagnostic hardening so rules/typecheck can remain key-compact while formatter/open-file paths keep full localisation payloads.
+    2. localisation YAML key existence/coverage indexing second (landed, including required type-template key checks)
+    3. continue `LocalisationKeyProvider` policy/diagnostic hardening so rules/typecheck remain key-compact while formatter/open-file paths keep full localisation payloads.
   - localisation parser implementation constraints (2026-02-09 decision):
     1. use shared lexer with explicit localisation mode/options and consume it from localisation module.
     2. avoid dual-path parsing strategies; if lexer mode is adopted, localisation adapter must use that path exclusively.
@@ -181,6 +187,7 @@ Phase 1.1 progress:
   - parked optimization note:
     - experimental lexer micro-optimization variant is preserved at `jominipy/lexer/faster_lexer.py` and intentionally not active runtime code at this stage.
   - harden parity edge cases for alias/subtype/complex-enum semantics against CWTools behavior (`type_key_filter`, `starts_with`, subtype `push_scope`, complex enum edge-path semantics).
+  - harden alias/single-alias unresolved/dynamic invocation policy edges (`defer` vs strict error) and subtype-gated invocation interactions.
   - retain `<spriteType>`-first validation semantics for gameplay icon fields.
 
 Boundary constraints (must remain true):

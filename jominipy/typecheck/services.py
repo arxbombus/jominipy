@@ -11,9 +11,13 @@ from jominipy.localisation.keys import (
     load_localisation_key_provider_from_project_root,
 )
 from jominipy.rules.adapter import (
+    AliasDefinition,
+    AliasInvocation,
     LinkDefinition,
     LocalisationCommandDefinition,
     ModifierDefinition,
+    SingleAliasDefinition,
+    SingleAliasInvocation,
     SubtypeMatcher,
     TypeLocalisationTemplate,
 )
@@ -55,6 +59,18 @@ class TypecheckServices:
     alias_memberships_by_family: Mapping[str, frozenset[str]] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    alias_definitions_by_family: Mapping[str, Mapping[str, AliasDefinition]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    alias_invocations_by_object: Mapping[str, tuple[AliasInvocation, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    single_alias_definitions_by_name: Mapping[str, SingleAliasDefinition] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    single_alias_invocations_by_object: Mapping[str, tuple[SingleAliasInvocation, ...]] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
     subtype_matchers_by_object: Mapping[str, tuple[SubtypeMatcher, ...]] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -89,6 +105,8 @@ def build_typecheck_services_from_file_texts(
         build_complex_enum_values_from_file_texts,
         build_type_memberships_from_file_texts,
         extract_type_definitions,
+        load_hoi4_alias_definitions_by_family,
+        load_hoi4_alias_invocations_by_object,
         load_hoi4_alias_members_by_family,
         load_hoi4_complex_enum_definitions,
         load_hoi4_field_constraints,
@@ -97,6 +115,8 @@ def build_typecheck_services_from_file_texts(
         load_hoi4_localisation_command_definitions,
         load_hoi4_modifier_definitions,
         load_hoi4_schema_graph,
+        load_hoi4_single_alias_definitions,
+        load_hoi4_single_alias_invocations_by_object,
         load_hoi4_subtype_field_constraints_by_object,
         load_hoi4_subtype_matchers_by_object,
         load_hoi4_type_localisation_templates_by_type,
@@ -125,6 +145,10 @@ def build_typecheck_services_from_file_texts(
         family="modifier",
         values=modifier_names,
     )
+    alias_definitions = load_hoi4_alias_definitions_by_family()
+    alias_invocations = load_hoi4_alias_invocations_by_object()
+    single_alias_definitions = load_hoi4_single_alias_definitions()
+    single_alias_invocations = load_hoi4_single_alias_invocations_by_object()
     type_memberships = _merge_memberships(
         memberships,
         {"modifier": modifier_names},
@@ -142,6 +166,10 @@ def build_typecheck_services_from_file_texts(
         known_scopes=load_hoi4_known_scopes(),
         enum_memberships_by_key=MappingProxyType(complex_enum_memberships),
         alias_memberships_by_family=MappingProxyType(alias_memberships),
+        alias_definitions_by_family=MappingProxyType(alias_definitions),
+        alias_invocations_by_object=MappingProxyType(alias_invocations),
+        single_alias_definitions_by_name=MappingProxyType(single_alias_definitions),
+        single_alias_invocations_by_object=MappingProxyType(single_alias_invocations),
         subtype_matchers_by_object=MappingProxyType(load_hoi4_subtype_matchers_by_object()),
         subtype_field_constraints_by_object=MappingProxyType(load_hoi4_subtype_field_constraints_by_object()),
         link_definitions_by_name=MappingProxyType(load_hoi4_link_definitions()),
@@ -176,6 +204,10 @@ def build_typecheck_services_from_project_root(
         known_scopes=services.known_scopes,
         enum_memberships_by_key=services.enum_memberships_by_key,
         alias_memberships_by_family=services.alias_memberships_by_family,
+        alias_definitions_by_family=services.alias_definitions_by_family,
+        alias_invocations_by_object=services.alias_invocations_by_object,
+        single_alias_definitions_by_name=services.single_alias_definitions_by_name,
+        single_alias_invocations_by_object=services.single_alias_invocations_by_object,
         subtype_matchers_by_object=services.subtype_matchers_by_object,
         subtype_field_constraints_by_object=services.subtype_field_constraints_by_object,
         link_definitions_by_name=services.link_definitions_by_name,

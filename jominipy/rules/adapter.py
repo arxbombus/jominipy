@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 import re
+from types import MappingProxyType
 from typing import Mapping
 
 from jominipy.ast import AstBlock, AstKeyValue
@@ -96,6 +97,41 @@ class TypeLocalisationTemplate:
     template: str
     required: bool = False
     subtype_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AliasDefinition:
+    """Normalized alias declaration (`alias[family:name]`)."""
+
+    family: str
+    name: str
+    value_specs: tuple[RuleValueSpec, ...]
+    field_constraints: Mapping[str, RuleFieldConstraint]
+
+
+@dataclass(frozen=True, slots=True)
+class AliasInvocation:
+    """Invocation site where dynamic alias keys are accepted."""
+
+    family: str
+    parent_path: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SingleAliasDefinition:
+    """Normalized single-alias declaration (`single_alias[...]`)."""
+
+    name: str
+    value_specs: tuple[RuleValueSpec, ...]
+    field_constraints: Mapping[str, RuleFieldConstraint]
+
+
+@dataclass(frozen=True, slots=True)
+class SingleAliasInvocation:
+    """Invocation site where a single-alias should apply."""
+
+    alias_name: str
+    field_path: tuple[str, ...]
 
 
 def build_alias_members_by_family(schema: RuleSchemaGraph) -> dict[str, frozenset[str]]:
@@ -369,6 +405,126 @@ def build_type_localisation_templates_by_type(
     return {type_key: tuple(templates) for type_key, templates in templates_by_type.items() if templates}
 
 
+def build_alias_definitions_by_family(
+    schema: RuleSchemaGraph,
+) -> dict[str, Mapping[str, AliasDefinition]]:
+    """Build alias definitions grouped by family then alias name."""
+    by_family: dict[str, dict[str, AliasDefinition]] = {}
+    for raw_alias_name, declarations in schema.aliases_by_key.items():
+        if ":" not in raw_alias_name:
+            continue
+        family, declared_name = (part.strip() for part in raw_alias_name.split(":", 1))
+        if not family:
+            continue
+        bucket = by_family.setdefault(family, {})
+        for declaration in declarations:
+            name_raw = (declaration.argument or declared_name).strip()
+            name = name_raw.split(":", 1)[1].strip() if ":" in name_raw else name_raw
+            if not name:
+                continue
+            statement = declaration.statement
+            value_specs = extract_value_specs(statement.value)
+            field_constraints = (
+                _build_constraints_from_rule_block(
+                    statement.value.block,
+                    single_alias_constraints={},
+                )
+                if statement.value.kind == "block"
+                else {}
+            )
+            existing = bucket.get(name)
+            if existing is None:
+                bucket[name] = AliasDefinition(
+                    family=family,
+                    name=name,
+                    value_specs=value_specs,
+                    field_constraints=MappingProxyType(field_constraints),
+                )
+                continue
+            merged_fields = _merge_field_constraints(existing.field_constraints, field_constraints)
+            bucket[name] = AliasDefinition(
+                family=family,
+                name=name,
+                value_specs=_merge_specs(existing.value_specs, value_specs),
+                field_constraints=MappingProxyType(merged_fields),
+            )
+    return {
+        family: MappingProxyType(definitions)
+        for family, definitions in by_family.items()
+        if definitions
+    }
+
+
+def build_single_alias_definitions(
+    schema: RuleSchemaGraph,
+) -> dict[str, SingleAliasDefinition]:
+    """Build single-alias definitions by alias name."""
+    definitions: dict[str, SingleAliasDefinition] = {}
+    for alias_name, declarations in schema.single_aliases_by_key.items():
+        merged_specs: tuple[RuleValueSpec, ...] = ()
+        merged_fields: dict[str, RuleFieldConstraint] = {}
+        for declaration in declarations:
+            statement = declaration.statement
+            merged_specs = _merge_specs(merged_specs, extract_value_specs(statement.value))
+            if statement.value.kind == "block":
+                merged_fields = _merge_field_constraints(
+                    merged_fields,
+                    _build_constraints_from_rule_block(
+                        statement.value.block,
+                        single_alias_constraints={},
+                    ),
+                )
+        if merged_specs or merged_fields:
+            definitions[alias_name] = SingleAliasDefinition(
+                name=alias_name,
+                value_specs=merged_specs,
+                field_constraints=MappingProxyType(merged_fields),
+            )
+    return definitions
+
+
+def build_alias_invocations_by_object(schema: RuleSchemaGraph) -> dict[str, tuple[AliasInvocation, ...]]:
+    """Build alias invocation paths from top-level rule declarations."""
+    invocations: dict[str, list[AliasInvocation]] = {}
+    for statement in schema.top_level_rule_statements:
+        object_key = statement.key
+        if object_key is None or statement.value.kind != "block":
+            continue
+        bucket = invocations.setdefault(object_key, [])
+        _collect_alias_invocations(
+            statement.value.block,
+            path=(object_key,),
+            output=bucket,
+        )
+    return {
+        object_key: tuple(_dedupe_alias_invocations(items))
+        for object_key, items in invocations.items()
+        if items
+    }
+
+
+def build_single_alias_invocations_by_object(
+    schema: RuleSchemaGraph,
+) -> dict[str, tuple[SingleAliasInvocation, ...]]:
+    """Build single-alias invocation paths from top-level rule declarations."""
+    invocations: dict[str, list[SingleAliasInvocation]] = {}
+    for statement in schema.top_level_rule_statements:
+        object_key = statement.key
+        if object_key is None or statement.value.kind != "block":
+            continue
+        bucket = invocations.setdefault(object_key, [])
+        _collect_single_alias_invocations(
+            statement.value.block,
+            path=(object_key,),
+            output=bucket,
+        )
+    return {
+        object_key: tuple(_dedupe_single_alias_invocations(items))
+        for object_key, items in invocations.items()
+        if items
+    }
+
+
 @lru_cache(maxsize=1)
 def load_hoi4_values_memberships_by_key() -> dict[str, frozenset[str]]:
     """Load special-file values memberships from HOI4 schema."""
@@ -402,6 +558,34 @@ def load_hoi4_type_localisation_templates_by_type() -> dict[str, tuple[TypeLocal
     """Load per-type localisation templates from HOI4 schema."""
     schema = load_hoi4_schema_graph()
     return build_type_localisation_templates_by_type(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_alias_definitions_by_family() -> dict[str, Mapping[str, AliasDefinition]]:
+    """Load alias definitions grouped by family/name from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_alias_definitions_by_family(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_alias_invocations_by_object() -> dict[str, tuple[AliasInvocation, ...]]:
+    """Load alias invocation paths grouped by top-level object from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_alias_invocations_by_object(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_single_alias_definitions() -> dict[str, SingleAliasDefinition]:
+    """Load single-alias definitions by alias name from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_single_alias_definitions(schema)
+
+
+@lru_cache(maxsize=1)
+def load_hoi4_single_alias_invocations_by_object() -> dict[str, tuple[SingleAliasInvocation, ...]]:
+    """Load single-alias invocation paths grouped by top-level object from HOI4 schema."""
+    schema = load_hoi4_schema_graph()
+    return build_single_alias_invocations_by_object(schema)
 
 
 def build_subtype_matchers_by_object(schema: RuleSchemaGraph) -> dict[str, tuple[SubtypeMatcher, ...]]:
@@ -515,6 +699,107 @@ def _collect_type_localisation_templates(
         seen.add(dedupe)
         templates.append(item)
     return tuple(templates)
+
+
+def _collect_alias_invocations(
+    statements: tuple[RuleStatement, ...],
+    *,
+    path: tuple[str, ...],
+    output: list[AliasInvocation],
+) -> None:
+    for statement in statements:
+        if statement.kind != "key_value" or statement.key is None:
+            continue
+        family = _parse_bracket_key(statement.key, expected_family="alias_name")
+        if family is not None:
+            specs = extract_value_specs(statement.value)
+            if any(
+                spec.kind == "alias_match_left_ref" and (spec.argument or "").strip() == family
+                for spec in specs
+            ):
+                output.append(AliasInvocation(family=family, parent_path=path))
+        child_path = (*path, statement.key)
+        if statement.value.kind == "block":
+            _collect_alias_invocations(
+                statement.value.block,
+                path=child_path,
+                output=output,
+            )
+
+
+def _collect_single_alias_invocations(
+    statements: tuple[RuleStatement, ...],
+    *,
+    path: tuple[str, ...],
+    output: list[SingleAliasInvocation],
+) -> None:
+    for statement in statements:
+        if statement.kind != "key_value" or statement.key is None:
+            continue
+        child_path = (*path, statement.key)
+        specs = extract_value_specs(statement.value)
+        for spec in specs:
+            if spec.kind != "single_alias_ref":
+                continue
+            alias_name = (spec.argument or "").strip()
+            if not alias_name:
+                continue
+            output.append(SingleAliasInvocation(alias_name=alias_name, field_path=child_path))
+        if statement.value.kind == "block":
+            _collect_single_alias_invocations(
+                statement.value.block,
+                path=child_path,
+                output=output,
+            )
+
+
+def _merge_field_constraints(
+    left: Mapping[str, RuleFieldConstraint],
+    right: Mapping[str, RuleFieldConstraint],
+) -> dict[str, RuleFieldConstraint]:
+    merged = dict(left)
+    for field_name, constraint in right.items():
+        existing = merged.get(field_name)
+        if existing is None:
+            merged[field_name] = constraint
+            continue
+        merged[field_name] = RuleFieldConstraint(
+            required=existing.required or constraint.required,
+            value_specs=_merge_specs(existing.value_specs, constraint.value_specs),
+            comparison=existing.comparison or constraint.comparison,
+            error_if_only_match=existing.error_if_only_match or constraint.error_if_only_match,
+            outgoing_reference_label=existing.outgoing_reference_label or constraint.outgoing_reference_label,
+            incoming_reference_label=existing.incoming_reference_label or constraint.incoming_reference_label,
+        )
+    return merged
+
+
+def _dedupe_alias_invocations(
+    invocations: list[AliasInvocation],
+) -> list[AliasInvocation]:
+    deduped: list[AliasInvocation] = []
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    for invocation in invocations:
+        key = (invocation.family, invocation.parent_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(invocation)
+    return deduped
+
+
+def _dedupe_single_alias_invocations(
+    invocations: list[SingleAliasInvocation],
+) -> list[SingleAliasInvocation]:
+    deduped: list[SingleAliasInvocation] = []
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    for invocation in invocations:
+        key = (invocation.alias_name, invocation.field_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(invocation)
+    return deduped
 
 
 def _collect_modifier_category_scopes(schema: RuleSchemaGraph) -> dict[str, tuple[str, ...]]:

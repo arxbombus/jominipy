@@ -53,7 +53,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Full type-reference resolution and validation (`<type_key>`, prefixed/suffixed forms) against project-discovered members.
 - [ ] Final scope-resolution hardening (`scope[...]` + alias chain) across deeper cross-object flows and remaining non-trivial replacement edge cases.
 - [ ] Full value/value_set dynamic validation across files and execution scopes.
-- [ ] Full alias expansion semantics beyond current `alias_match_left[...]` membership + `single_alias_right[...]` constraint expansion.
+- [ ] Full alias/single-alias hardening beyond current execution pass (remaining unresolved-policy, dynamic invocation, and subtype-interaction parity edges).
 - [ ] Full subtype semantics (`type_key_filter`, `starts_with`, subtype `push_scope`, ordering/precedence edge cases) beyond current field-value matcher gating.
 - [ ] Full complex enum semantics parity (additional path/structure edge cases and parity verification against CWTools behavior).
 - [ ] Full special-file semantics parity (`scopes.cwt`, `links.cwt`, `modifiers.cwt`, `values.cwt`, `localisation.cwt`) in checker/linter engines.
@@ -61,7 +61,7 @@ This checklist tracks what parts of the CWTools rules syntax are currently imple
 - [ ] Complete migration of hard correctness checks to typecheck ownership (keeping lint for policy/style/heuristics).
 
 ### Highest-priority parity gaps (full-surface audit)
-- [ ] Full alias/single-alias execution parity (current pass covers `single_alias_right[...]` expansion and `alias_match_left[...]` membership checks only).
+- [ ] Full alias/single-alias execution parity hardening (base execution now landed; remaining work is unresolved/dynamic invocation strictness and deeper edge-case parity).
 - [ ] Full subtype gating/materialization parity (`type_key_filter`, subtype `push_scope`, `starts_with`, ordering semantics).
 - [ ] Full complex enum parity hardening (current pass materializes enums from project files with `name` tree + `start_from_root` + path filters).
 - [ ] Special-file semantic ingestion hardening:
@@ -560,7 +560,7 @@ This file contains a block `localisation_commands ` that contains a list of loca
 - Stage 1: implement command/scope compatibility from `localisation.cwt` (`localisation_commands`, optional localisation-link metadata) as semantic adapter artifacts consumed by typecheck.
 - Stage 2: add localisation YAML ingestion for key existence/coverage checks (for required localisation keys and reference validation).
 - Stage 2a (initial landed): introduce `LocalisationKeyProvider` for compact key-level queries in rules/lint/typecheck paths; keep full parse payload loading as on-demand behavior.
-- Stage 2a follow-up: extend provider-backed diagnostics/policies and complete remaining localisation semantic parity edges.
+- Stage 2a follow-up: extend provider-backed diagnostics/policies and complete remaining localisation semantic parity edges (base key existence/coverage + required type-template checks are landed).
 - Rationale: command/scope parity is rules-semantic and should land first; YAML key checks are content-index validation and can be layered without changing architecture.
 
 #### Localisation parser requirements (agreed constraints, 2026-02-09)

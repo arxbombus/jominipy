@@ -67,6 +67,12 @@ For every parser/CST/AST feature, record:
   - update (2026-02-08): registry-backed asset lookup contract added for typecheck (`jominipy/typecheck/assets.py`), mirroring Biome-style shared-service injection patterns while keeping one parse/facts lifecycle.
   - update (2026-02-08): HOI4 icon correctness is now documented as primarily type-reference resolution (`<spriteType>` from `interface/gfx.cwt`) with texture file existence validated on sprite definitions, not direct icon filename path checks alone.
   - update (2026-02-08): alias/single-alias adapter wiring landed (`single_alias_right[...]` expansion + `alias_match_left[...]` membership checks) with checker integration.
+  - update (2026-02-09): alias/single-alias execution expansion landed:
+    - adapter artifacts now extract alias/single-alias definitions and invocation paths,
+    - typecheck now validates alias/single-alias invocation blocks against extracted rule constraints.
+  - update (2026-02-09): localisation required-template parity expanded:
+    - type-localisation templates (`$` forms + `## required`) are extracted from rules adapters,
+    - typecheck validates required materialized keys against compact localisation key-provider artifacts.
   - update (2026-02-08): subtype adapter wiring landed (deterministic matcher gating + subtype-conditional field constraints in typecheck).
   - update (2026-02-08): complex enum materialization landed (project-file scan + name-tree traversal + `start_from_root`/path filtering) and is injected into enum reference checks through services.
   - update (2026-02-08): special-file provider pass 1 landed:

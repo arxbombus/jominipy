@@ -10,6 +10,7 @@ from typing import Literal, Mapping, Protocol
 from jominipy.analysis import AnalysisFacts
 from jominipy.ast import (
     AstBlock,
+    AstKeyValue,
     AstScalar,
     AstTaggedBlockValue,
     interpret_scalar,
@@ -25,7 +26,11 @@ from jominipy.diagnostics import (
 )
 from jominipy.localisation.keys import LocalisationKeyProvider
 from jominipy.rules.adapter import (
+    AliasDefinition,
+    AliasInvocation,
     LinkDefinition,
+    SingleAliasDefinition,
+    SingleAliasInvocation,
     SubtypeMatcher,
     TypeLocalisationTemplate,
 )
@@ -567,6 +572,105 @@ class TypeLocalisationRequirementRule:
 
 
 @dataclass(frozen=True, slots=True)
+class AliasExecutionRule:
+    """Checks alias/single-alias invocation values against extracted definitions."""
+
+    code: str = TYPECHECK_INVALID_FIELD_REFERENCE.code
+    name: str = "aliasExecution"
+    domain: TypecheckDomain = "correctness"
+    confidence: TypecheckConfidence = "sound"
+    alias_definitions_by_family: Mapping[str, Mapping[str, AliasDefinition]] = MappingProxyType({})
+    alias_invocations_by_object: Mapping[str, tuple[AliasInvocation, ...]] = MappingProxyType({})
+    single_alias_definitions_by_name: Mapping[str, SingleAliasDefinition] = MappingProxyType({})
+    single_alias_invocations_by_object: Mapping[str, tuple[SingleAliasInvocation, ...]] = MappingProxyType({})
+    asset_registry: AssetRegistry = NullAssetRegistry()
+    policy: TypecheckPolicy = TypecheckPolicy()
+
+    def run(self, facts: AnalysisFacts, type_facts: TypecheckFacts, text: str) -> list[Diagnostic]:
+        diagnostics: list[Diagnostic] = []
+        diagnostics.extend(self._run_alias_invocations(facts=facts, text=text))
+        diagnostics.extend(self._run_single_alias_invocations(facts=facts, text=text))
+        return diagnostics
+
+    def _run_alias_invocations(self, *, facts: AnalysisFacts, text: str) -> list[Diagnostic]:
+        diagnostics: list[Diagnostic] = []
+        for object_key, invocations in self.alias_invocations_by_object.items():
+            object_fields = tuple(field_fact for field_fact in facts.all_field_facts if field_fact.object_key == object_key)
+            if not object_fields:
+                continue
+            for invocation in invocations:
+                family_definitions = self.alias_definitions_by_family.get(invocation.family)
+                if not family_definitions:
+                    continue
+                for field_fact in object_fields:
+                    if field_fact.path[:-1] != invocation.parent_path:
+                        continue
+                    alias_definition = family_definitions.get(field_fact.field_key)
+                    if alias_definition is None:
+                        continue
+                    diagnostics.extend(
+                        _validate_alias_like_value(
+                            object_key=object_key,
+                            object_occurrence=field_fact.object_occurrence,
+                            field_key=field_fact.field_key,
+                            value=field_fact.value,
+                            text=text,
+                            value_specs=alias_definition.value_specs,
+                            field_constraints=alias_definition.field_constraints,
+                            alias_definitions_by_family=self.alias_definitions_by_family,
+                            asset_registry=self.asset_registry,
+                            policy=self.policy,
+                        )
+                    )
+        return diagnostics
+
+    def _run_single_alias_invocations(self, *, facts: AnalysisFacts, text: str) -> list[Diagnostic]:
+        diagnostics: list[Diagnostic] = []
+        for object_key, invocations in self.single_alias_invocations_by_object.items():
+            object_fields = tuple(field_fact for field_fact in facts.all_field_facts if field_fact.object_key == object_key)
+            if not object_fields:
+                continue
+            by_path = {field_fact.path: field_fact for field_fact in object_fields}
+            for invocation in invocations:
+                field_fact = by_path.get(invocation.field_path)
+                if field_fact is None:
+                    continue
+                definition = self.single_alias_definitions_by_name.get(invocation.alias_name)
+                if definition is None:
+                    if self.policy.unresolved_reference == "defer":
+                        continue
+                    diagnostics.append(
+                        Diagnostic(
+                            code=self.code,
+                            message=(
+                                f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                                f"Unknown single-alias `{invocation.alias_name}`."
+                            ),
+                            range=_find_key_occurrence_range(text, object_key, field_fact.object_occurrence),
+                            severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                            hint="Define the single_alias declaration or remove the single_alias_right reference.",
+                            category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                        )
+                    )
+                    continue
+                diagnostics.extend(
+                    _validate_alias_like_value(
+                        object_key=object_key,
+                        object_occurrence=field_fact.object_occurrence,
+                        field_key=field_fact.field_key,
+                        value=field_fact.value,
+                        text=text,
+                        value_specs=definition.value_specs,
+                        field_constraints=definition.field_constraints,
+                        alias_definitions_by_family=self.alias_definitions_by_family,
+                        asset_registry=self.asset_registry,
+                        policy=self.policy,
+                    )
+                )
+        return diagnostics
+
+
+@dataclass(frozen=True, slots=True)
 class LocalisationCommandScopeRule:
     """Checks localisation command usage against `localisation_commands` scope metadata."""
 
@@ -820,6 +924,130 @@ class ErrorIfOnlyMatchRule:
         return diagnostics
 
 
+def _validate_alias_like_value(
+    *,
+    object_key: str,
+    object_occurrence: int,
+    field_key: str,
+    value: object | None,
+    text: str,
+    value_specs: tuple[RuleValueSpec, ...],
+    field_constraints: Mapping[str, RuleFieldConstraint],
+    alias_definitions_by_family: Mapping[str, Mapping[str, AliasDefinition]],
+    asset_registry: AssetRegistry,
+    policy: TypecheckPolicy,
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    if value_specs and not _matches_value_specs(
+        value,
+        value_specs,
+        asset_registry=asset_registry,
+        policy=policy,
+    ):
+        diagnostics.append(
+            Diagnostic(
+                code=TYPECHECK_INVALID_FIELD_REFERENCE.code,
+                message=(
+                    f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                    f"Alias field `{field_key}` does not match {_format_value_specs(value_specs)}."
+                ),
+                range=_find_key_occurrence_range(text, object_key, object_occurrence),
+                severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                hint=f"Use a value matching alias constraints for `{field_key}`.",
+                category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+            )
+        )
+        return diagnostics
+
+    if not field_constraints:
+        return diagnostics
+    if not isinstance(value, AstBlock) or not value.is_object_like:
+        return diagnostics
+
+    child_fields = [statement for statement in value.statements if isinstance(statement, AstKeyValue)]
+    child_map: dict[str, list[AstKeyValue]] = {}
+    for child in child_fields:
+        child_map.setdefault(child.key.raw_text, []).append(child)
+
+    static_constraints: dict[str, RuleFieldConstraint] = {}
+    alias_families: list[str] = []
+    for child_key, constraint in field_constraints.items():
+        family = _parse_alias_name_family(child_key)
+        if family is not None:
+            alias_families.append(family)
+            continue
+        static_constraints[child_key] = constraint
+
+    for child_key, constraint in static_constraints.items():
+        if constraint.required and child_key not in child_map:
+            diagnostics.append(
+                Diagnostic(
+                    code=TYPECHECK_INVALID_FIELD_REFERENCE.code,
+                    message=(
+                        f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                        f"Alias field `{field_key}` is missing required child field `{child_key}`."
+                    ),
+                    range=_find_key_occurrence_range(text, object_key, object_occurrence),
+                    severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                    hint=f"Add `{child_key} = ...` to alias field `{field_key}`.",
+                    category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                )
+            )
+            continue
+        for child in child_map.get(child_key, []):
+            if _matches_value_specs(child.value, constraint.value_specs, asset_registry=asset_registry, policy=policy):
+                continue
+            diagnostics.append(
+                Diagnostic(
+                    code=TYPECHECK_INVALID_FIELD_REFERENCE.code,
+                    message=(
+                        f"{TYPECHECK_INVALID_FIELD_REFERENCE.message} "
+                        f"Alias child `{field_key}.{child_key}` does not match {_format_value_specs(constraint.value_specs)}."
+                    ),
+                    range=_find_key_occurrence_range(text, object_key, object_occurrence),
+                    severity=TYPECHECK_INVALID_FIELD_REFERENCE.severity,
+                    hint=f"Use a value matching alias constraints for `{child_key}`.",
+                    category=TYPECHECK_INVALID_FIELD_REFERENCE.category,
+                )
+            )
+
+    if alias_families:
+        for child in child_fields:
+            if child.key.raw_text in static_constraints:
+                continue
+            matched_dynamic = False
+            for family in alias_families:
+                family_defs = alias_definitions_by_family.get(family, {})
+                alias_definition = family_defs.get(child.key.raw_text)
+                if alias_definition is None:
+                    continue
+                matched_dynamic = True
+                diagnostics.extend(
+                    _validate_alias_like_value(
+                        object_key=object_key,
+                        object_occurrence=object_occurrence,
+                        field_key=child.key.raw_text,
+                        value=child.value,
+                        text=text,
+                        value_specs=alias_definition.value_specs,
+                        field_constraints=alias_definition.field_constraints,
+                        alias_definitions_by_family=alias_definitions_by_family,
+                        asset_registry=asset_registry,
+                        policy=policy,
+                    )
+                )
+            if matched_dynamic:
+                continue
+    return diagnostics
+
+
+def _parse_alias_name_family(raw_key: str) -> str | None:
+    if not raw_key.startswith("alias_name[") or not raw_key.endswith("]"):
+        return None
+    family = raw_key[len("alias_name[") : -1].strip()
+    return family or None
+
+
 def build_typecheck_facts(facts: AnalysisFacts) -> TypecheckFacts:
     inconsistent: dict[str, tuple[str, ...]] = {}
     for key, shapes in facts.top_level_shapes.items():
@@ -871,6 +1099,14 @@ def default_typecheck_rules(*, services: TypecheckServices | None = None) -> tup
             type_memberships_by_key=resolved_services.type_memberships_by_key,
             type_localisation_templates_by_type=resolved_services.type_localisation_templates_by_type,
             localisation_key_provider=resolved_services.localisation_key_provider,
+            policy=resolved_services.policy,
+        ),
+        AliasExecutionRule(
+            alias_definitions_by_family=resolved_services.alias_definitions_by_family,
+            alias_invocations_by_object=resolved_services.alias_invocations_by_object,
+            single_alias_definitions_by_name=resolved_services.single_alias_definitions_by_name,
+            single_alias_invocations_by_object=resolved_services.single_alias_invocations_by_object,
+            asset_registry=resolved_services.asset_registry,
             policy=resolved_services.policy,
         ),
         LocalisationCommandScopeRule(

@@ -1,13 +1,19 @@
 from pathlib import Path
 
 from jominipy.rules import (
+    AliasDefinition,
+    AliasInvocation,
     LinkDefinition,
     LocalisationCommandDefinition,
     ModifierDefinition,
     RuleFieldConstraint,
     RuleSchemaGraph,
     RuleValueSpec,
+    SingleAliasDefinition,
+    SingleAliasInvocation,
     TypeLocalisationTemplate,
+    build_alias_definitions_by_family,
+    build_alias_invocations_by_object,
     build_alias_members_by_family,
     build_complex_enum_definitions,
     build_complex_enum_values_from_file_texts,
@@ -18,6 +24,8 @@ from jominipy.rules import (
     build_modifier_definitions,
     build_required_fields_by_object,
     build_schema_graph,
+    build_single_alias_definitions,
+    build_single_alias_invocations_by_object,
     build_subtype_field_constraints_by_object,
     build_subtype_matchers_by_object,
     build_type_localisation_templates_by_type,
@@ -295,6 +303,71 @@ alias[trigger:has_government] = bool
     assert memberships["trigger"] == frozenset({"has_government"})
 
 
+def test_alias_definitions_and_invocations_are_extracted() -> None:
+    source = """alias[effect:add_stability] = {
+    amount = int
+}
+technology = {
+    immediate = {
+        alias_name[effect] = alias_match_left[effect]
+    }
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-alias-exec.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_alias_definitions_by_family(schema)
+    invocations = build_alias_invocations_by_object(schema)
+
+    assert definitions["effect"]["add_stability"] == AliasDefinition(
+        family="effect",
+        name="add_stability",
+        value_specs=(RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),),
+        field_constraints={
+            "amount": RuleFieldConstraint(
+                required=False,
+                value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+            )
+        },
+    )
+    assert invocations["technology"] == (
+        AliasInvocation(family="effect", parent_path=("technology", "immediate")),
+    )
+
+
+def test_single_alias_definitions_and_invocations_are_extracted() -> None:
+    source = """single_alias[test_clause] = {
+    count = int
+}
+technology = {
+    clause = single_alias_right[test_clause]
+}
+"""
+    parsed = parse_rules_text(source, source_path="inline-single-alias-exec.cwt")
+    file_ir = to_file_ir(parsed)
+    ruleset = normalize_ruleset((file_ir,))
+    schema = build_schema_graph(source_root="inline", ruleset=ruleset)
+
+    definitions = build_single_alias_definitions(schema)
+    invocations = build_single_alias_invocations_by_object(schema)
+
+    assert definitions["test_clause"] == SingleAliasDefinition(
+        name="test_clause",
+        value_specs=(RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),),
+        field_constraints={
+            "count": RuleFieldConstraint(
+                required=False,
+                value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+            )
+        },
+    )
+    assert invocations["technology"] == (
+        SingleAliasInvocation(alias_name="test_clause", field_path=("technology", "clause")),
+    )
+
+
 def test_type_localisation_templates_are_extracted_from_type_declarations() -> None:
     source = """types = {
     type[ship_size] = {
@@ -516,3 +589,5 @@ def test_localisation_command_definitions_are_extracted() -> None:
         name="GetWing",
         supported_scopes=("air", "country"),
     )
+    SingleAliasDefinition,
+    SingleAliasInvocation,

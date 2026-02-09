@@ -225,6 +225,11 @@ def test_typecheck_services_include_modifier_and_localisation_providers() -> Non
 
     assert "modifier" in services.alias_memberships_by_family
     assert "annex_cost_factor" in services.alias_memberships_by_family["modifier"]
+    assert services.alias_definitions_by_family
+    assert any(services.alias_definitions_by_family.values())
+    assert services.alias_invocations_by_object
+    assert services.single_alias_definitions_by_name
+    assert services.single_alias_invocations_by_object
     assert "modifier" in services.type_memberships_by_key
     assert "annex_cost_factor" in services.type_memberships_by_key["modifier"]
     assert "GetName" in services.localisation_command_definitions_by_name

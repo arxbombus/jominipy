@@ -152,6 +152,18 @@ def _bind_services_to_rules(
             replacements["localisation_key_provider"] = services.localisation_key_provider
         if hasattr(rule, "alias_memberships_by_family") and not getattr(rule, "alias_memberships_by_family"):
             replacements["alias_memberships_by_family"] = services.alias_memberships_by_family
+        if hasattr(rule, "alias_definitions_by_family") and not getattr(rule, "alias_definitions_by_family"):
+            replacements["alias_definitions_by_family"] = services.alias_definitions_by_family
+        if hasattr(rule, "alias_invocations_by_object") and not getattr(rule, "alias_invocations_by_object"):
+            replacements["alias_invocations_by_object"] = services.alias_invocations_by_object
+        if hasattr(rule, "single_alias_definitions_by_name") and not getattr(
+            rule, "single_alias_definitions_by_name"
+        ):
+            replacements["single_alias_definitions_by_name"] = services.single_alias_definitions_by_name
+        if hasattr(rule, "single_alias_invocations_by_object") and not getattr(
+            rule, "single_alias_invocations_by_object"
+        ):
+            replacements["single_alias_invocations_by_object"] = services.single_alias_invocations_by_object
         if hasattr(rule, "subtype_matchers_by_object") and not getattr(rule, "subtype_matchers_by_object"):
             replacements["subtype_matchers_by_object"] = services.subtype_matchers_by_object
         if hasattr(rule, "subtype_field_constraints_by_object") and not getattr(

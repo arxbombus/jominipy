@@ -187,6 +187,9 @@ Every agent must perform this checklist before finishing a substantive task:
 - Phase 1.1 Phase C (initial primitive/range correctness in typecheck + field-type correctness migration out of lint) is now landed.
 - Phase 1.1 Phase C extension (registry-backed `filepath`/`icon` checks via `AssetRegistry`) is now landed.
 - Phase 1.1 Phase D (initial alias/single-alias semantic adapter wiring) is now landed.
+- Phase 1.1 Phase D2 (alias/single-alias execution parity expansion) is now landed:
+  - adapter artifacts now include alias/single-alias definitions + invocation paths,
+  - typecheck now executes alias/single-alias invocation validation against extracted rule constraints.
 - Phase 1.1 Phase E (initial subtype gating/materialization) is now landed.
 - Phase 1.1 Phase F (initial complex enum materialization) is now landed.
 - Update (current): scope-context transition checks and scope-alias resolution (`this/root/from/fromfrom...` + `prev/prevprev...`) are landed in typecheck, including sibling-branch non-leakage and ambiguity diagnostics (`TYPECHECK_AMBIGUOUS_SCOPE_CONTEXT`).
@@ -199,11 +202,14 @@ Every agent must perform this checklist before finishing a substantive task:
 - Update (current): option-surface parity is now landed (`comparison`, `error_if_only_match`, reference labels), including `TYPECHECK_RULE_CUSTOM_ERROR` execution wiring.
 - Update (current): deeper `links` advanced-chain semantics are now landed (multi-segment + mixed prefixed segments with per-segment input/data-source gating).
 - Update (current): strict `push_scope`/`replace_scope` precedence compatibility is now landed (CWTools precedence: same-path `push_scope` wins; `replace_scope` skipped).
-- Immediate next step: localisation Stage 2 (YAML key existence/coverage indexing and semantic validation wiring).
+- Localisation Stage 2 is now landed for rules/typecheck workflows:
+  - compact `LocalisationKeyProvider` key existence/coverage checks,
+  - required type-template localisation key materialization checks (`$` templates + `## required`).
+- Immediate next step: alias/single-alias hardening and edge-case parity (unresolved policy strictness + subtype-gated invocation behavior).
 - Update (2026-02-09 current): localisation parser is now implemented as a single full-file shared-lexer path and keeps all trivia/comments in a separate `LocalisationParseResult.trivia` channel.
   - Important boundary: entry-level value fields (`leading_trivia`/`trailing_trivia`) remain for value-local formatting semantics, while full-file comments/blank-line trivia are preserved separately for future formatter integration.
   - Column validation now uses dedicated diagnostic code `LOCALISATION_INVALID_COLUMN` (not generic `LOCALISATION_INVALID_ENTRY`).
-  - Indexing status note: current `LocalisationIndex` still stores full `LocalisationEntry` objects (including value/trivia payload fields); a compact `LocalisationKeyProvider` abstraction is planned but not implemented yet.
+  - Indexing status note: current `LocalisationIndex` still stores full `LocalisationEntry` objects (including value/trivia payload fields); `LocalisationKeyProvider` is implemented and used by rules/typecheck for compact key-level checks.
   - Planned design for rules/typecheck scale: default to key-only provider semantics for non-localisation-file workflows, and load full parse artifacts only on demand (formatter/open-loc-file paths).
   - Performance experiments were intentionally paused for now to stay on roadmap scope: optimized lexer variant was reverted from active runtime and parked at `jominipy/lexer/faster_lexer.py` for later whole-library optimization phase.
   - Priority reset: continue rules module parity work first; localisation formatter/trivia-resolution policy is deferred until formatter phase.
@@ -228,7 +234,11 @@ Every agent must perform this checklist before finishing a substantive task:
     - therefore localisation grammar must not depend on strict `STRING` token correctness for value payload capture.
   - Recommended adaptation (next agent implementation plan):
 
-## Latest Validation Snapshot (2026-02-09, tests split)
+## Latest Validation Snapshot (authoritative, 2026-02-09 current)
+- `uv run pytest -q tests/test_rules_ingest.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py tests/typecheck/test_services_and_facts.py` (`71 passed`)
+- `uv run ruff check jominipy/rules/adapter.py jominipy/rules/__init__.py jominipy/typecheck/services.py jominipy/typecheck/runner.py jominipy/typecheck/rules.py tests/test_rules_ingest.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py` (passed)
+
+## Validation Snapshot (historical)
 - `uv run pytest tests/test_lint_typecheck_engines.py tests/typecheck/test_field_constraint_rules.py tests/typecheck/test_reference_rules.py tests/typecheck/test_localisation_rules.py tests/typecheck/test_scope_rules.py tests/typecheck/test_services_and_facts.py tests/test_localisation_parser.py tests/test_localisation_keys.py` (`73 passed`)
     1. Add localisation parser mode/entrypoint and grammar (`parse_localisation_*`) while keeping existing Jomini parse path untouched.
     2. Parse header (`l_<locale>:`) and entry prefix (`key:version`) with normal tokens.

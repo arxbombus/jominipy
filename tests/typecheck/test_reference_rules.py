@@ -1,12 +1,17 @@
 from jominipy.pipeline import run_typecheck
 from jominipy.rules import (
+    AliasDefinition,
+    AliasInvocation,
     LinkDefinition,
     RuleFieldConstraint,
     RuleValueSpec,
+    SingleAliasDefinition,
+    SingleAliasInvocation,
     SubtypeMatcher,
 )
 from jominipy.rules.semantics import RuleFieldScopeConstraint
 from jominipy.typecheck.rules import (
+    AliasExecutionRule,
     FieldConstraintRule,
     FieldReferenceConstraintRule,
 )
@@ -154,6 +159,65 @@ def test_typecheck_field_reference_rule_validates_alias_match_left_membership() 
 
     typecheck_result = run_typecheck(source, rules=(custom_rule,))
     assert typecheck_result.diagnostics == []
+
+
+def test_typecheck_alias_execution_rule_validates_alias_block_fields() -> None:
+    source = "technology={ immediate={ add_stability={ amount=yes } } }\n"
+    custom_rule = AliasExecutionRule(
+        alias_definitions_by_family={
+            "effect": {
+                "add_stability": AliasDefinition(
+                    family="effect",
+                    name="add_stability",
+                    value_specs=(RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),),
+                    field_constraints={
+                        "amount": RuleFieldConstraint(
+                            required=False,
+                            value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                        )
+                    },
+                )
+            }
+        },
+        alias_invocations_by_object={
+            "technology": (
+                AliasInvocation(family="effect", parent_path=("technology", "immediate")),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "Alias child `add_stability.amount`" in typecheck_result.diagnostics[0].message
+
+
+def test_typecheck_alias_execution_rule_validates_single_alias_invocation() -> None:
+    source = "technology={ clause={ count=yes } }\n"
+    custom_rule = AliasExecutionRule(
+        single_alias_definitions_by_name={
+            "test_clause": SingleAliasDefinition(
+                name="test_clause",
+                value_specs=(RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),),
+                field_constraints={
+                    "count": RuleFieldConstraint(
+                        required=False,
+                        value_specs=(RuleValueSpec(kind="primitive", raw="int", primitive="int", argument=None),),
+                    )
+                },
+            )
+        },
+        single_alias_invocations_by_object={
+            "technology": (
+                SingleAliasInvocation(alias_name="test_clause", field_path=("technology", "clause")),
+            )
+        },
+        policy=TypecheckPolicy(unresolved_reference="error"),
+    )
+
+    typecheck_result = run_typecheck(source, rules=(custom_rule,))
+    assert [diagnostic.code for diagnostic in typecheck_result.diagnostics] == ["TYPECHECK_INVALID_FIELD_REFERENCE"]
+    assert "Alias child `clause.count`" in typecheck_result.diagnostics[0].message
 
 
 def test_typecheck_field_constraint_rule_applies_subtype_gating_per_object_occurrence() -> None:
