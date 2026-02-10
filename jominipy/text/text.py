@@ -1,5 +1,7 @@
+"""TextSize and TextRange."""
+
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True, order=True)
@@ -37,10 +39,6 @@ class TextSize:
 
     def __repr__(self) -> str:
         return f"TextSize({self.value})"
-
-
-ZERO: Final[TextSize] = TextSize(0)
-"""Constant representing a TextSize of zero."""
 
 
 @dataclass(frozen=True, slots=True, order=True)
@@ -180,3 +178,6 @@ def slice_text_range(source: str, range: TextRange) -> str:
     Coord system matches python string indices so we can just do this.
     """
     return source[range.start.value : range.end.value]
+
+
+__all__ = ["TextRange", "TextSize", "slice_text_range"]

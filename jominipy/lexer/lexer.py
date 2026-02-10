@@ -24,10 +24,9 @@ class LexerCheckpoint:
 class Lexer:
     """Lossless lexer that emits trivia and non-trivia tokens."""
 
-    def __init__(
-        self, source: str, *, allow_multiline_strings: bool = True
-    ) -> None:
+    def __init__(self, source: str, *, allow_multiline_strings: bool = True) -> None:
         self._source = source
+        self._source_len = len(source)
         self._position = 0
         self._after_newline = False
         self._current_start = TextSize.from_int(0)
@@ -69,7 +68,7 @@ class Lexer:
 
     @property
     def is_eof(self) -> bool:
-        return self._position >= len(self._source)
+        return self._position >= self._source_len
 
     @property
     def next_token(self) -> Token:
@@ -132,19 +131,14 @@ class Lexer:
         ch = self._current_char()
         if ch == "\0":
             return TokenKind.EOF
-
         if ch == "\r" or ch == "\n" or ch == "\t" or ch == " ":
             return self._consume_newline_or_whitespaces()
-
         if ch == "#":
             return self._lex_comment()
-
         if ch == '"':
             return self._lex_string()
-
         if ch.isdigit():
             return self._lex_number()
-
         if ch.isalpha() or ch == "_":
             return self._lex_identifier()
 

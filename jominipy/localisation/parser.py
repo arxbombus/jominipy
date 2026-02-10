@@ -150,10 +150,7 @@ def parse_localisation_text(
                     message=LOCALISATION_INVALID_COLUMN.message,
                     start=line.start,
                     end=line.end,
-                    hint=(
-                        f"{LOCALISATION_INVALID_COLUMN.hint} "
-                        f"Expected column {entry_column + 1}."
-                    ),
+                    hint=(f"{LOCALISATION_INVALID_COLUMN.hint} Expected column {entry_column + 1}."),
                     category=LOCALISATION_INVALID_COLUMN.category,
                     severity=LOCALISATION_INVALID_COLUMN.severity,
                 )
@@ -164,11 +161,7 @@ def parse_localisation_text(
         parsed_value = _extract_quoted_value_parts(raw_value)
         if parsed_value is None:
             first_non_ws = raw_value.lstrip()[:1]
-            code_spec = (
-                LEXER_UNTERMINATED_STRING
-                if first_non_ws in {'"', "'"}
-                else LOCALISATION_INVALID_VALUE_QUOTES
-            )
+            code_spec = LEXER_UNTERMINATED_STRING if first_non_ws in {'"', "'"} else LOCALISATION_INVALID_VALUE_QUOTES
             diagnostics.append(
                 _diagnostic(
                     code=code_spec.code,
@@ -188,11 +181,7 @@ def parse_localisation_text(
             source_path=source_path,
             locale=locale or "",
             key=parsed_entry.key,
-            version=(
-                int(parsed_entry.version_text)
-                if parsed_entry.version_text is not None
-                else None
-            ),
+            version=(int(parsed_entry.version_text) if parsed_entry.version_text is not None else None),
             leading_trivia=leading_trivia,
             raw_value=quoted_raw_value,
             trailing_trivia=trailing_trivia,
@@ -331,11 +320,7 @@ def _collect_trivia(source_text: str, tokens: list[Token]) -> list[LocalisationT
 
 
 def _parse_header_key(line_text: str, line_start: int, tokens: list[Token]) -> str | None:
-    significant = [
-        token
-        for token in tokens
-        if token.kind not in {TokenKind.WHITESPACE, TokenKind.COMMENT}
-    ]
+    significant = [token for token in tokens if token.kind not in {TokenKind.WHITESPACE, TokenKind.COMMENT}]
     if len(significant) < 2:
         return None
 
@@ -351,9 +336,7 @@ def _parse_header_key(line_text: str, line_start: int, tokens: list[Token]) -> s
     if len(significant) != 2:
         return None
 
-    header_key = line_text[
-        key_token.range.start.value - line_start : key_token.range.end.value - line_start
-    ]
+    header_key = line_text[key_token.range.start.value - line_start : key_token.range.end.value - line_start]
     if not header_key.startswith("l_"):
         return None
     return header_key
@@ -364,11 +347,7 @@ def _parse_entry_prefix(
     line: _LineInfo,
     tokens: list[Token],
 ) -> _EntryPrefix | None:
-    significant = [
-        token
-        for token in tokens
-        if token.kind not in {TokenKind.WHITESPACE, TokenKind.COMMENT}
-    ]
+    significant = [token for token in tokens if token.kind not in {TokenKind.WHITESPACE, TokenKind.COMMENT}]
     if not significant:
         return None
 

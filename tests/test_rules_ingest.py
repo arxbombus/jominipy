@@ -284,9 +284,7 @@ technology = {
 
     expanded = build_expanded_field_constraints(schema).by_object
     clause = expanded["technology"]["clause"]
-    assert clause.value_specs == (
-        RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),
-    )
+    assert clause.value_specs == (RuleValueSpec(kind="block", raw="{...}", primitive=None, argument=None),)
 
 
 def test_alias_memberships_are_grouped_by_family() -> None:
@@ -333,9 +331,7 @@ technology = {
             )
         },
     )
-    assert invocations["technology"] == (
-        AliasInvocation(family="effect", parent_path=("technology", "immediate")),
-    )
+    assert invocations["technology"] == (AliasInvocation(family="effect", parent_path=("technology", "immediate")),)
 
 
 def test_single_alias_definitions_and_invocations_are_extracted() -> None:
@@ -818,5 +814,3 @@ def test_localisation_command_definitions_are_extracted() -> None:
         name="GetWing",
         supported_scopes=("air", "country"),
     )
-    SingleAliasDefinition,
-    SingleAliasInvocation,

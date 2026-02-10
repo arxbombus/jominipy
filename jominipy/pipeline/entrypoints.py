@@ -35,9 +35,7 @@ def run_lint(
     """Run linting over one Jomini parse lifecycle."""
     resolved_parse = _resolve_parse(text, options=options, mode=mode, parse=parse)
     typecheck_result = (
-        typecheck
-        if typecheck is not None
-        else _run_typecheck(resolved_parse.source_text, parse=resolved_parse)
+        typecheck if typecheck is not None else _run_typecheck(resolved_parse.source_text, parse=resolved_parse)
     )
     if typecheck_result.parse is not resolved_parse:
         raise ValueError("Provided typecheck result must reuse the same parse result")
@@ -104,9 +102,7 @@ def run_check(
         parse=resolved_parse,
         typecheck=typecheck_result,
     )
-    diagnostics = _dedupe_diagnostics(
-        [*typecheck_result.diagnostics, *lint_result.diagnostics]
-    )
+    diagnostics = _dedupe_diagnostics([*typecheck_result.diagnostics, *lint_result.diagnostics])
     return CheckRunResult(
         parse=resolved_parse,
         diagnostics=diagnostics,

@@ -137,18 +137,12 @@ def _bind_services_to_rules(
         if hasattr(rule, "localisation_command_definitions_by_name") and not getattr(
             rule, "localisation_command_definitions_by_name"
         ):
-            replacements["localisation_command_definitions_by_name"] = (
-                services.localisation_command_definitions_by_name
-            )
+            replacements["localisation_command_definitions_by_name"] = services.localisation_command_definitions_by_name
         if hasattr(rule, "type_localisation_templates_by_type") and not getattr(
             rule, "type_localisation_templates_by_type"
         ):
-            replacements["type_localisation_templates_by_type"] = (
-                services.type_localisation_templates_by_type
-            )
-        if hasattr(rule, "localisation_key_provider") and getattr(
-            rule, "localisation_key_provider"
-        ).is_empty:
+            replacements["type_localisation_templates_by_type"] = services.type_localisation_templates_by_type
+        if hasattr(rule, "localisation_key_provider") and getattr(rule, "localisation_key_provider").is_empty:
             replacements["localisation_key_provider"] = services.localisation_key_provider
         if hasattr(rule, "alias_memberships_by_family") and not getattr(rule, "alias_memberships_by_family"):
             replacements["alias_memberships_by_family"] = services.alias_memberships_by_family
@@ -156,9 +150,7 @@ def _bind_services_to_rules(
             replacements["alias_definitions_by_family"] = services.alias_definitions_by_family
         if hasattr(rule, "alias_invocations_by_object") and not getattr(rule, "alias_invocations_by_object"):
             replacements["alias_invocations_by_object"] = services.alias_invocations_by_object
-        if hasattr(rule, "single_alias_definitions_by_name") and not getattr(
-            rule, "single_alias_definitions_by_name"
-        ):
+        if hasattr(rule, "single_alias_definitions_by_name") and not getattr(rule, "single_alias_definitions_by_name"):
             replacements["single_alias_definitions_by_name"] = services.single_alias_definitions_by_name
         if hasattr(rule, "single_alias_invocations_by_object") and not getattr(
             rule, "single_alias_invocations_by_object"
